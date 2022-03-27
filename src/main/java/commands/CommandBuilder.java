@@ -60,6 +60,21 @@ public class CommandBuilder {
     }
 
     /**
+     * @return
+     *  Whether type is primitive
+     */
+    private boolean isPrimitive(Class<?> type) {
+        return type.equals(byte.class) ||
+                type.equals(short.class) ||
+                type.equals(int.class) ||
+                type.equals(long.class) ||
+                type.equals(float.class) ||
+                type.equals(double.class) ||
+                type.equals(boolean.class) ||
+                type.equals(char.class);
+    }
+
+    /**
      * Adds a slash command method.
      * @param method
      *  The method to add
@@ -80,6 +95,12 @@ public class CommandBuilder {
         boolean doesHaveCommandContext = false;
         for(int i = 0; i < method.getParameterCount(); i++) {
             Parameter parameter = method.getParameters()[i];
+
+            if(parameter.isVarArgs())
+                throw new InvalidParameterException("Parameter cannot be varargs");
+
+            if(isPrimitive(parameter.getType()))
+                throw new InvalidParameterException("Parameter cannot be a primitive type");
 
             boolean isCommandContext = CommandContext.class.equals(parameter.getType());
 

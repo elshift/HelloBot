@@ -72,7 +72,10 @@ public final class CommandInfo {
     }
 
     // I wish JDA let you grab the raw object...
-    private Object getOptionValue(@NotNull JDA jna, @NotNull OptionMapping mapping) {
+    private Object getOptionValue(@NotNull JDA jna, OptionMapping mapping) {
+        if(mapping == null)
+            return null;
+
         switch (mapping.getType()) {
             case STRING -> {
                 return mapping.getAsString();

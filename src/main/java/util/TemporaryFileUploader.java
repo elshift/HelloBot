@@ -13,9 +13,19 @@ import org.apache.http.util.EntityUtils;
 import java.io.File;
 import java.io.IOException;
 
-public class FileUploader {
+/**
+ * Helper class for uploading files to a temporary hosting service.
+ */
+public class TemporaryFileUploader {
     private static final String UPLOAD_URL = "https://transfer.sh/";
 
+    /**
+     * Uploads a file to the temporary file hosting service.
+     * @param file
+     *  The file to upload
+     * @return
+     *  The URL returned by the server
+     */
     public static String uploadAndGetURL(File file) throws IOException {
         try(CloseableHttpClient client = HttpClients.createDefault()) {
             HttpUriRequest request = RequestBuilder.put(UPLOAD_URL + file.getName())

@@ -16,6 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Listens for and handles execution of interactions.
+ */
 public class CommandHandler extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(CommandHandler.class);
     private final List<CommandInfo> commands;
