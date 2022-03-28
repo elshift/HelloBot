@@ -38,7 +38,7 @@ public class CommandBuilder {
         put(Message.Attachment.class, OptionType.ATTACHMENT);
     }};
 
-    private OptionData getParameterOptionData(Parameter parameter) {
+    private @NotNull OptionData getParameterOptionData(@NotNull Parameter parameter) {
         if(!typeMap.containsKey(parameter.getType()))
             throw new InvalidParameterException("Unknown parameter type: " + parameter.getType().getName());
 
@@ -63,7 +63,7 @@ public class CommandBuilder {
      * @return
      *  Whether type is primitive
      */
-    private boolean isPrimitive(Class<?> type) {
+    private boolean isPrimitive(@NotNull Class<?> type) {
         return type.equals(byte.class) ||
                 type.equals(short.class) ||
                 type.equals(int.class) ||
@@ -105,7 +105,7 @@ public class CommandBuilder {
             boolean isCommandContext = CommandContext.class.equals(parameter.getType());
 
             if(i == 0 && !isCommandContext)
-                throw new InvalidParameterException("First parameter must be " + CommandContext.class.getName());
+                throw new InvalidParameterException("First parameter must be %s".formatted(CommandContext.class.getName()));
             else if (isCommandContext) {
                 doesHaveCommandContext = true;
                 continue;
@@ -115,7 +115,7 @@ public class CommandBuilder {
         }
 
         if(!doesHaveCommandContext)
-            throw new InvalidParameterException("Method provided must have " + CommandContext.class.getName() + "as first parameter");
+            throw new InvalidParameterException("Method provided must have %s as first parameter".formatted(CommandContext.class.getName()));
 
         commandInfoList.add(new CommandInfo(slashCommand, method.getDeclaringClass(), method, group, options));
         return this;

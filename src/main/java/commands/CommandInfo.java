@@ -58,7 +58,7 @@ public final class CommandInfo {
      * @return
      *  Whether the interaction event matches this command
      */
-    public boolean matchesEvent(SlashCommandInteractionEvent event) {
+    public boolean matchesEvent(@NotNull SlashCommandInteractionEvent event) {
         if (event.getSubcommandGroup() == null && getGroup() != null)
             return false;
         if (event.getSubcommandGroup() != null && getGroup() == null)

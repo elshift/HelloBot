@@ -62,7 +62,7 @@ public class CommandHandler extends ListenerAdapter {
     /**
      * Attempt to execute a command
      */
-    private void handleCommand(SlashCommandInteractionEvent event, CommandInfo commandInfo) {
+    private void handleCommand(SlashCommandInteractionEvent event, @NotNull CommandInfo commandInfo) {
         CommandContext context = new CommandContext(event);
         List<OptionMapping> args = commandInfo.getOptions().stream().map(option -> event.getOption(option.getName())).collect(Collectors.toList());
 

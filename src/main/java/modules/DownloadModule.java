@@ -11,6 +11,7 @@ import util.TemporaryFileUploader;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -23,17 +24,21 @@ public class DownloadModule {
     // Matches an Instagram, Twitter, Reddit, or TikTok post url
     private static final Pattern validUrlPatterns
             = Pattern.compile("(https://)?(www.)?" +
-            "(instagram.com((/p/)?(/tv/)?)[a-zA-Z\\\\d-]{11})?" +
+            "(instagram.com((/p/)?(/tv/)?(/reel/)?)[a-zA-Z\\d-]{11})?" +
             "(twitter.com/[a-zA-Z\\d]/status/\\d{19})?" +
             "(reddit.com/r/[a-zA-Z\\d_/-]+)?" +
-            "(tiktok.com/@[a-zA-Z\\d]+/video/\\d{19})?");
+            "(tiktok.com/@[a-zA-Z\\d]+/video/\\d{19})?" +
+            "/?");
 
     private static final File downloadsDir = new File(Config.get().downloadDir());
-    private static final String YT_DLP_BIN = "/usr/bin/yt-dlp";
+    private static String YT_DLP_BIN = "/usr/bin/yt-dlp";
+    private static final String YT_DLP_BIN_ALT = "/usr/local/bin/yt-dlp";
 
     static {
         assert downloadsDir.mkdirs();
+
         purgeOldFiles();
+        checkYTDLP();
     }
 
     /**
@@ -51,6 +56,24 @@ public class DownloadModule {
     }
 
     /**
+     * Tries to find a yt-dlp install.
+     */
+    private static void checkYTDLP() {
+        if (Files.exists(Path.of(YT_DLP_BIN)))
+            return;
+
+        logger.warn("Failed to find yt-dlp at {}, trying {}", YT_DLP_BIN, YT_DLP_BIN_ALT);
+
+        if(Files.exists(Path.of(YT_DLP_BIN_ALT))) {
+            YT_DLP_BIN = YT_DLP_BIN_ALT;
+            logger.info("Using {}", YT_DLP_BIN);
+        }
+        else
+            logger.error("Cannot find a yt-dlp install! Download module will not work. You can install it by running" +
+                    "sudo pip3 install yt-dlp");
+    }
+
+    /**
      * Attempts to download media from given url and attempts to save the result to destination.
      * @param destination
      *  Destination path for downloaded media
@@ -62,9 +85,7 @@ public class DownloadModule {
     private static File download(@NotNull Path destination, String url) throws IOException, InterruptedException {
         purgeOldFiles();
 
-        ProcessBuilder builder = new ProcessBuilder(YT_DLP_BIN, "-o" + destination, url);
-
-        builder.redirectOutput(new File("output.txt"));
+        ProcessBuilder builder = new ProcessBuilder(YT_DLP_BIN, "-o%s".formatted(destination), url);
         builder.start().waitFor(10, TimeUnit.SECONDS);
 
         File file = new File(destination.toString());
@@ -85,7 +106,7 @@ public class DownloadModule {
         Matcher matcher = validUrlPatterns.matcher(url);
 
         if (!matcher.matches()) {
-            context.replyEphemeral("Invalid URL.");
+            context.replyEphemeral("Invalid URL. Try removing any extra parameters.");
             return;
         }
 
@@ -95,7 +116,7 @@ public class DownloadModule {
 
         context.event().deferReply().queue();
         try {
-            Path destination = Path.of(Config.get().downloadDir(), context.event().getUser().getId() + ".mp4");
+            Path destination = Path.of(Config.get().downloadDir(), "%s.mp4".formatted(context.event().getUser().getId()));
             File downloadedFile = download(destination, url);
 
             long fileSizeKB = downloadedFile.length() / 1024;
@@ -113,6 +134,7 @@ public class DownloadModule {
                     .sendMessage("Your video took too long to download!")
                     .setEphemeral(true).queue();
         } catch (Exception e) {
+            logger.warn("Failed to download video", e);
             context.event().getHook()
                     .sendMessage("Failed to download video (image only posts aren't supported on all platforms).")
                     .setEphemeral(true).queue();

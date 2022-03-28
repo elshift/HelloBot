@@ -3,8 +3,9 @@ package config;
 import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.*;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.Serializable;
 
 public class Config implements Serializable {
     private static final transient Logger logger = LoggerFactory.getLogger(Config.class);
@@ -22,7 +23,7 @@ public class Config implements Serializable {
         try(FileWriter writer = new FileWriter(path)) {
             writer.write(gson.toJson(config));
         } catch(Exception e) {
-            logger.error("Failed to write config file: " + path, e);
+            logger.error("Failed to write config file: %s".formatted(path), e);
         }
     }
 
@@ -33,8 +34,9 @@ public class Config implements Serializable {
         try(FileReader reader = new FileReader(configPath)) {
             result = gson.fromJson(reader, Config.class);
         } catch (Exception e) {
-            logger.info("Failed to load config, creating default");
+            logger.info("Failed to load config, creating default. You need to edit config.json to include the bot token.");
             saveDefault(configPath);
+            System.exit(0);
         }
 
         return result;
