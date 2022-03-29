@@ -1,5 +1,6 @@
 package commands;
 
+import commands.annotations.RunMode;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -14,6 +15,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
@@ -22,6 +25,9 @@ import java.util.stream.Collectors;
 public class CommandHandler extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(CommandHandler.class);
     private final List<CommandInfo> commands;
+
+    private final ExecutorService synchronousExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService asynchronousExecutor = Executors.newCachedThreadPool();
 
     public CommandHandler(List<CommandInfo> commands) {
         this.commands = commands;
@@ -60,18 +66,26 @@ public class CommandHandler extends ListenerAdapter {
     }
 
     /**
-     * Attempt to execute a command
+     * Attempt to execute a command.
      */
     private void handleCommand(SlashCommandInteractionEvent event, @NotNull CommandInfo commandInfo) {
         CommandContext context = new CommandContext(event);
         List<OptionMapping> args = commandInfo.getOptions().stream().map(option -> event.getOption(option.getName())).collect(Collectors.toList());
 
-        try {
-            commandInfo.invoke(context, args);
-        } catch (Exception e) {
-            logger.error("Failed to collect arguments for command {}", commandInfo.getCommand().name(), e);
-            event.reply("Failed to execute command!").setEphemeral(true).queue();
-        }
+        Runnable invoke = () -> {
+            try {
+                commandInfo.invoke(context, args);
+            } catch (Exception e) {
+                logger.error("Failed to collect arguments for command {}", commandInfo.getCommand().name(), e);
+                event.reply("Failed to execute command!").setEphemeral(true).queue();
+                e.printStackTrace();
+            }
+        };
+
+        if(commandInfo.getRunMode() == RunMode.Mode.Async)
+            asynchronousExecutor.execute(invoke);
+        else
+            synchronousExecutor.execute(invoke);
     }
 
     @Override

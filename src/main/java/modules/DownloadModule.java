@@ -2,6 +2,7 @@ package modules;
 
 import commands.CommandContext;
 import commands.annotations.Option;
+import commands.annotations.RunMode;
 import commands.annotations.SlashCommand;
 import config.Config;
 import org.jetbrains.annotations.NotNull;
@@ -13,7 +14,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,25 +34,34 @@ public class DownloadModule {
             "/?");
 
     private static final File downloadsDir = new File(Config.get().downloadDir());
-    private static String YT_DLP_BIN = "/usr/bin/yt-dlp";
-    private static final String YT_DLP_BIN_ALT = "/usr/local/bin/yt-dlp";
+    private static final Path YT_DLP_BIN = Path.of(downloadsDir.toString(), "yt-dlp");
+    private static final String YT_DLP_BIN_LINUX = "/bin/yt-dlp";
+
+    private static final ConcurrentLinkedQueue<File> removalQueue = new ConcurrentLinkedQueue<>();
 
     static {
-        assert downloadsDir.mkdirs();
+        downloadsDir.mkdirs();
 
         purgeOldFiles();
-        checkYTDLP();
+        try {
+            checkYTDLP();
+        } catch (Exception e) {
+            logger.error("Failed to find yt-dlp; download module will not work", e);
+        }
     }
 
     /**
-     * Purges any non-directory files in the download directory.
+     * Purges any non-directory and non-executable files in the download directory.
      */
     private static void purgeOldFiles() {
         try {
             for (File file : Objects.requireNonNull(downloadsDir.listFiles())) {
-                if(!file.isDirectory())
+                if(!file.isDirectory() && !file.canExecute() && Instant.now().toEpochMilli() - file.lastModified() > (120 * 1000))
                     file.delete();
             }
+
+            removalQueue.forEach(File::delete);
+            removalQueue.clear();
         } catch (Exception e) {
             // ignored
         }
@@ -58,19 +70,21 @@ public class DownloadModule {
     /**
      * Tries to find a yt-dlp install.
      */
-    private static void checkYTDLP() {
-        if (Files.exists(Path.of(YT_DLP_BIN)))
+    private static void checkYTDLP() throws IOException {
+        if (Files.exists(YT_DLP_BIN))
             return;
 
-        logger.warn("Failed to find yt-dlp at {}, trying {}", YT_DLP_BIN, YT_DLP_BIN_ALT);
-
-        if(Files.exists(Path.of(YT_DLP_BIN_ALT))) {
-            YT_DLP_BIN = YT_DLP_BIN_ALT;
-            logger.info("Using {}", YT_DLP_BIN);
+        String os = System.getProperty("os.name");
+        if(os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            if (Files.exists(Path.of(YT_DLP_BIN_LINUX))) {
+                logger.info("Found yt-dlp: {}", YT_DLP_BIN);
+                Files.createSymbolicLink(YT_DLP_BIN, Path.of(YT_DLP_BIN_LINUX));
+            } else
+                logger.error("Cannot find a yt-dlp install! Download module will not work. " +
+                        "You can install it via your package manager.");
+        } else {
+            logger.error("You need to download the latest version of yt-dlp and place it in %s".formatted(YT_DLP_BIN));
         }
-        else
-            logger.error("Cannot find a yt-dlp install! Download module will not work. You can install it by running" +
-                    "sudo pip3 install yt-dlp");
     }
 
     /**
@@ -85,7 +99,7 @@ public class DownloadModule {
     private static File download(@NotNull Path destination, String url) throws IOException, InterruptedException {
         purgeOldFiles();
 
-        ProcessBuilder builder = new ProcessBuilder(YT_DLP_BIN, "-o%s".formatted(destination), url);
+        ProcessBuilder builder = new ProcessBuilder(YT_DLP_BIN.toString(), "-o%s".formatted(destination), url);
         builder.start().waitFor(10, TimeUnit.SECONDS);
 
         File file = new File(destination.toString());
@@ -102,6 +116,7 @@ public class DownloadModule {
     }
 
     @SlashCommand(name = "download", description = "Download a video from Twitter, Instagram, TikTok, or Reddit")
+    @RunMode(RunMode.Mode.Async)
     public void downloadVideo(CommandContext context, @Option(name = "url", description = "post url") String url) {
         Matcher matcher = validUrlPatterns.matcher(url);
 
@@ -116,19 +131,23 @@ public class DownloadModule {
 
         context.event().deferReply().queue();
         try {
-            Path destination = Path.of(Config.get().downloadDir(), "%s.mp4".formatted(context.event().getUser().getId()));
+            Path destination = Path.of(Config.get().downloadDir(), "%s.mp4".formatted(Instant.now().toEpochMilli()));
             File downloadedFile = download(destination, url);
 
-            long fileSizeKB = downloadedFile.length() / 1024;
+            long fileSize = downloadedFile.length();
+            long maxFileSize = 1024 * 1024 * 8;
+
+            if(context.event().isFromGuild())
+                maxFileSize = Objects.requireNonNull(context.event().getGuild()).getMaxFileSize();
 
             // File is small enough to upload directly to Discord
-            if (fileSizeKB < 8000) {
+            if (fileSize < maxFileSize) {
                 context.event().getHook().sendFile(downloadedFile).queue();
                 return;
             }
 
             String remoteUrl = TemporaryFileUploader.uploadAndGetURL(downloadedFile);
-            context.event().getHook().sendMessage(remoteUrl).queue();
+            context.event().getHook().sendMessage(remoteUrl).queue(m -> removalQueue.add(downloadedFile));
         } catch(InterruptedException e) {
             context.event().getHook()
                     .sendMessage("Your video took too long to download!")

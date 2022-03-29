@@ -13,8 +13,9 @@ import org.slf4j.LoggerFactory;
 
 public class HelloBot extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(HelloBot.class);
+    private JDA jda;
 
-    public void createBot(String[] args) {
+    public void createBot(String[] args, String token) {
         try {
             CommandHandler commandHandler = new CommandHandler(
                     new CommandBuilder()
@@ -22,7 +23,7 @@ public class HelloBot extends ListenerAdapter {
                             .build()
             );
 
-            JDA jda = JDABuilder.createDefault(Config.get().token())
+            jda = JDABuilder.createDefault(token)
                     .addEventListeners(this, commandHandler)
                     .build();
 
@@ -30,6 +31,11 @@ public class HelloBot extends ListenerAdapter {
         } catch (Exception e) {
             logger.error("Failed to create bot", e);
         }
+    }
+
+    public void shutdownBot() {
+        logger.info("Shutting down");
+        jda.shutdown();
     }
 
     @Override

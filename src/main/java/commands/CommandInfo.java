@@ -1,6 +1,7 @@
 package commands;
 
 import commands.annotations.CommandGroup;
+import commands.annotations.RunMode;
 import commands.annotations.SlashCommand;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Channel;
@@ -28,13 +29,15 @@ public final class CommandInfo {
     private final @NotNull Method method;
     private final CommandGroup group;
     private final List<OptionData> options;
+    private final RunMode.Mode runMode;
 
     public CommandInfo(
             @NotNull SlashCommand command,
             @NotNull Class<?> klass,
             @NotNull Method method,
             @Nullable CommandGroup group,
-            @NotNull List<OptionData> options
+            @NotNull List<OptionData> options,
+            @Nullable RunMode runMode
     ) {
         this.command = command;
         try {
@@ -45,6 +48,7 @@ public final class CommandInfo {
         this.method = method;
         this.group = group;
         this.options = options;
+        this.runMode = runMode == null ? RunMode.Mode.Sync : runMode.value();
     }
 
     private boolean isSubcommandOf(String group) {
@@ -146,5 +150,13 @@ public final class CommandInfo {
      */
     public List<OptionData> getOptions() {
         return options == null ? EMPTY_OPTIONS_LIST : options;
+    }
+
+    /**
+     * @return
+     *  The mode of execution for this command
+     */
+    public RunMode.Mode getRunMode() {
+        return runMode;
     }
 }

@@ -1,6 +1,11 @@
+import config.Config;
+
 public class Main {
+    private static final HelloBot bot = new HelloBot();
+
     public static void main(String[] args) {
-        HelloBot bot = new HelloBot();
-        bot.createBot(args);
+        bot.createBot(args, Config.get().token());
+
+        Runtime.getRuntime().addShutdownHook(new Thread(bot::shutdownBot));
     }
 }

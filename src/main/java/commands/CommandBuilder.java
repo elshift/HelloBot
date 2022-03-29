@@ -1,9 +1,6 @@
 package commands;
 
-import commands.annotations.CommandGroup;
-import commands.annotations.Name;
-import commands.annotations.Option;
-import commands.annotations.SlashCommand;
+import commands.annotations.*;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
@@ -117,7 +114,18 @@ public class CommandBuilder {
         if(!doesHaveCommandContext)
             throw new InvalidParameterException("Method provided must have %s as first parameter".formatted(CommandContext.class.getName()));
 
-        commandInfoList.add(new CommandInfo(slashCommand, method.getDeclaringClass(), method, group, options));
+        RunMode runMode = method.getAnnotation(RunMode.class);
+
+        commandInfoList.add(
+                new CommandInfo(
+                        slashCommand,
+                        method.getDeclaringClass(),
+                        method,
+                        group,
+                        options,
+                        runMode
+                )
+        );
         return this;
     }
 
