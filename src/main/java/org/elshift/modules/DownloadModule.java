@@ -1,14 +1,14 @@
-package modules;
+package org.elshift.modules;
 
-import commands.CommandContext;
-import commands.annotations.Option;
-import commands.annotations.RunMode;
-import commands.annotations.SlashCommand;
-import config.Config;
+import org.elshift.commands.annotations.Option;
+import org.elshift.commands.annotations.RunMode;
+import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.CommandContext;
+import org.elshift.config.Config;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import util.TemporaryFileUploader;
+import org.elshift.util.TemporaryFileUploader;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,8 +34,10 @@ public class DownloadModule {
             "/?");
 
     private static final File downloadsDir = new File(Config.get().downloadDir());
-    private static final Path YT_DLP_BIN = Path.of(downloadsDir.toString(), "yt-dlp");
-    private static final String YT_DLP_BIN_LINUX = "/bin/yt-dlp";
+    private static Path YT_DLP_BIN = Path.of(downloadsDir.toString(), "yt-dlp");
+    private static final Path YT_DLP_BIN_LINUX = Path.of("/bin/yt-dlp");
+    private static final Path YT_DLP_BIN_WINDOWS = Path.of(downloadsDir.toString(), "yt-dlp.exe");
+    private static boolean hasRequiredDependencies = false;
 
     private static final ConcurrentLinkedQueue<File> removalQueue = new ConcurrentLinkedQueue<>();
 
@@ -56,7 +58,8 @@ public class DownloadModule {
     private static void purgeOldFiles() {
         try {
             for (File file : Objects.requireNonNull(downloadsDir.listFiles())) {
-                if(!file.isDirectory() && !file.canExecute() && Instant.now().toEpochMilli() - file.lastModified() > (120 * 1000))
+                if(!file.isDirectory() && !file.canExecute()
+                        && Instant.now().toEpochMilli() - file.lastModified() > (120 * 1000))
                     file.delete();
             }
 
@@ -74,16 +77,27 @@ public class DownloadModule {
         if (Files.exists(YT_DLP_BIN))
             return;
 
-        String os = System.getProperty("os.name");
-        if(os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-            if (Files.exists(Path.of(YT_DLP_BIN_LINUX))) {
-                logger.info("Found yt-dlp: {}", YT_DLP_BIN);
-                Files.createSymbolicLink(YT_DLP_BIN, Path.of(YT_DLP_BIN_LINUX));
-            } else
-                logger.error("Cannot find a yt-dlp install! Download module will not work. " +
-                        "You can install it via your package manager.");
+        String osName = System.getProperty("os.name").toLowerCase();
+        boolean isLinux = osName.contains("nix") || osName.contains("nux") || osName.contains("aix");
+        boolean isWindows = osName.contains("win");
+
+        Path installBin = isLinux ? YT_DLP_BIN_LINUX : isWindows ? YT_DLP_BIN_WINDOWS : null;
+        if(installBin == null) {
+            logger.error("Make sure both ffmpeg and yt-dlp are installed. " +
+                    "You need to symlink the path to your yt-dlp install to %s".formatted(YT_DLP_BIN));
+            return;
+        }
+
+        if(Files.exists(installBin)) {
+            logger.info("Found yt-dlp: {}", installBin);
+            if(isLinux)
+                Files.createSymbolicLink(YT_DLP_BIN, YT_DLP_BIN_LINUX);
+            else // Windows
+                YT_DLP_BIN = YT_DLP_BIN_WINDOWS;
+            hasRequiredDependencies = true;
         } else {
-            logger.error("You need to download the latest version of yt-dlp and place it in %s".formatted(YT_DLP_BIN));
+            logger.error("Cannot find a yt-dlp install! " +
+                    "You can install it with your package manager or the GitHub page.");
         }
     }
 
@@ -104,11 +118,18 @@ public class DownloadModule {
 
         File file = new File(destination.toString());
 
-        // yt-dlp may append an extension by itself for whatever reason, just find any file where the id is present
+        // Just in case
         if(!file.exists()) {
-            File[] files = downloadsDir.listFiles((dir, name) -> name.contains(destination.getFileName().toString()));
+            String fileName = destination.getFileName().toString();
+            int periodIdx = fileName.lastIndexOf('.');
+            String fileNameNoExt = fileName.substring(0, periodIdx);
+            String extension = fileName.substring(periodIdx);
+
+            File[] files = downloadsDir.listFiles((dir, name) ->
+                    name.contains(fileNameNoExt) && name.contains(extension));
             if(files == null || files.length == 0)
                 throw new IOException("Failed to find file");
+
             file = files[0];
         }
 
@@ -118,6 +139,11 @@ public class DownloadModule {
     @SlashCommand(name = "download", description = "Download a video from Twitter, Instagram, TikTok, or Reddit")
     @RunMode(RunMode.Mode.Async)
     public void downloadVideo(CommandContext context, @Option(name = "url", description = "post url") String url) {
+        if(!hasRequiredDependencies) {
+            context.replyEphemeral("Missing dependencies: ffmpeg + yt-dlp. Check log for more info.");
+            return;
+        }
+
         Matcher matcher = validUrlPatterns.matcher(url);
 
         if (!matcher.matches()) {
@@ -142,19 +168,19 @@ public class DownloadModule {
 
             // File is small enough to upload directly to Discord
             if (fileSize < maxFileSize) {
-                context.event().getHook().sendFile(downloadedFile).queue();
+                context.hook().sendFile(downloadedFile).queue();
                 return;
             }
 
             String remoteUrl = TemporaryFileUploader.uploadAndGetURL(downloadedFile);
-            context.event().getHook().sendMessage(remoteUrl).queue(m -> removalQueue.add(downloadedFile));
+            context.hook().sendMessage(remoteUrl).queue(m -> removalQueue.add(downloadedFile));
         } catch(InterruptedException e) {
-            context.event().getHook()
+            context.hook()
                     .sendMessage("Your video took too long to download!")
                     .setEphemeral(true).queue();
         } catch (Exception e) {
             logger.warn("Failed to download video", e);
-            context.event().getHook()
+            context.hook()
                     .sendMessage("Failed to download video (image only posts aren't supported on all platforms).")
                     .setEphemeral(true).queue();
         }

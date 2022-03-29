@@ -1,4 +1,4 @@
-package util;
+package org.elshift.util;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.client.ClientProtocolException;

@@ -1,4 +1,6 @@
-import config.Config;
+package org.elshift;
+
+import org.elshift.config.Config;
 
 public class Main {
     private static final HelloBot bot = new HelloBot();

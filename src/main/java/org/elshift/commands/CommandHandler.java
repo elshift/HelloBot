@@ -1,9 +1,10 @@
-package commands;
+package org.elshift.commands;
 
-import commands.annotations.RunMode;
+import org.elshift.commands.annotations.RunMode;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
@@ -90,7 +91,11 @@ public class CommandHandler extends ListenerAdapter {
 
     @Override
     public void onGuildReady(@NotNull GuildReadyEvent event) {
-        registerCommandsForGuild(event.getGuild());
+        try {
+            registerCommandsForGuild(event.getGuild());
+        } catch (ErrorResponseException e) {
+            logger.warn("Failed to create commands for guild: %s".formatted(event.getGuild().getName()));
+        }
     }
 
     @Override

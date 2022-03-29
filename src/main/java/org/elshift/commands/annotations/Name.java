@@ -1,4 +1,4 @@
-package commands.annotations;
+package org.elshift.commands.annotations;
 
 import org.jetbrains.annotations.NotNull;
 

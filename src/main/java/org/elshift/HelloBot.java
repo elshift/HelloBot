@@ -1,11 +1,12 @@
-import commands.CommandBuilder;
-import commands.CommandHandler;
-import config.Config;
-import modules.DownloadModule;
+package org.elshift;
+
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.events.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import org.elshift.commands.CommandBuilder;
+import org.elshift.commands.CommandHandler;
+import org.elshift.modules.DownloadModule;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,8 +35,8 @@ public class HelloBot extends ListenerAdapter {
     }
 
     public void shutdownBot() {
-        logger.info("Shutting down");
         jda.shutdown();
+        logger.info("Shutting down");
     }
 
     @Override

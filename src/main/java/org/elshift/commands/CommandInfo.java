@@ -1,13 +1,14 @@
-package commands;
+package org.elshift.commands;
 
-import commands.annotations.CommandGroup;
-import commands.annotations.RunMode;
-import commands.annotations.SlashCommand;
+import org.elshift.commands.annotations.CommandGroup;
+import org.elshift.commands.annotations.RunMode;
+import org.elshift.commands.annotations.SlashCommand;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Channel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import org.elshift.commands.CommandContext;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;

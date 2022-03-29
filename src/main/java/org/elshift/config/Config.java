@@ -1,4 +1,4 @@
-package config;
+package org.elshift.config;
 
 import com.google.gson.Gson;
 import org.slf4j.Logger;

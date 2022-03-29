@@ -1,6 +1,6 @@
-package commands;
+package org.elshift.commands;
 
-import commands.annotations.*;
+import org.elshift.commands.annotations.*;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;

@@ -49,7 +49,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>Main</mainClass>
+                            <mainClass>org.elshift.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
