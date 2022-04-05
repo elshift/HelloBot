@@ -24,14 +24,15 @@ import java.util.regex.Pattern;
 public class DownloadModule {
     private static final Logger logger = LoggerFactory.getLogger(DownloadModule.class);
 
-    // Matches an Instagram, Twitter, Reddit, or TikTok post url
+    // Matches a YouTube, Instagram, Twitter, Reddit, or TikTok post url
     private static final Pattern validUrlPatterns
-            = Pattern.compile("(https://)?(www.)?" +
+            = Pattern.compile("(http://)?(https://)?(www.)?" +
             "(instagram.com((/p/)?(/tv/)?(/reel/)?)[a-zA-Z\\d-]{11})?" +
-            "(twitter.com/[a-zA-Z\\d]/status/\\d{19})?" +
+            "(twitter.com/[a-zA-Z_\\d]+/status/\\d{19})?" +
             "(reddit.com/r/[a-zA-Z\\d_/-]+)?" +
             "(tiktok.com/@[a-zA-Z\\d]+/video/\\d{19})?" +
-            "/?");
+            "(youtu(?:be\\.com/watch\\?v=|\\.be/)([\\w\\-_]*)(&(amp;)?\u200C\u200B[\\w?\u200C\u200B=]*)?)?" +
+            "(?:[a-zA-Z\\d&=?]+)?/?");// Accept &, =, ? and standard letters/numbers for URL parameters, and trailing slashes.
 
     private static final File downloadsDir = new File(Config.get().downloadDir());
     private static Path YT_DLP_BIN = Path.of(downloadsDir.toString(), "yt-dlp");
@@ -42,7 +43,9 @@ public class DownloadModule {
     private static final ConcurrentLinkedQueue<File> removalQueue = new ConcurrentLinkedQueue<>();
 
     static {
-        downloadsDir.mkdirs();
+        if (!downloadsDir.mkdirs() && !downloadsDir.exists()) {
+            logger.error("Failed to create download directory.");
+        }
 
         purgeOldFiles();
         try {
@@ -60,10 +63,16 @@ public class DownloadModule {
             for (File file : Objects.requireNonNull(downloadsDir.listFiles())) {
                 if(!file.isDirectory() && !file.canExecute()
                         && Instant.now().toEpochMilli() - file.lastModified() > (120 * 1000))
-                    file.delete();
+                    if (!file.delete() && file.exists()) {
+                        logger.error("Failed to delete old file {}.", file.getName());
+                    }
             }
 
-            removalQueue.forEach(File::delete);
+            removalQueue.forEach((file) -> {
+                if (!file.delete() && file.exists()) {
+                    logger.error("Failed to delete file {} in removal queue.", file.getName());
+                }
+            });
             removalQueue.clear();
         } catch (Exception e) {
             // ignored
@@ -74,8 +83,10 @@ public class DownloadModule {
      * Tries to find a yt-dlp install.
      */
     private static void checkYTDLP() throws IOException {
-        if (Files.exists(YT_DLP_BIN))
+        if (Files.exists(YT_DLP_BIN)) {
+            hasRequiredDependencies = true;
             return;
+        }
 
         String osName = System.getProperty("os.name").toLowerCase();
         boolean isLinux = osName.contains("nix") || osName.contains("nux") || osName.contains("aix");
@@ -136,7 +147,7 @@ public class DownloadModule {
         return file;
     }
 
-    @SlashCommand(name = "download", description = "Download a video from Twitter, Instagram, TikTok, or Reddit")
+    @SlashCommand(name = "download", description = "Download a video from YouTube, Twitter, Instagram, TikTok, or Reddit")
     @RunMode(RunMode.Mode.Async)
     public void downloadVideo(CommandContext context, @Option(name = "url", description = "post url") String url) {
         if(!hasRequiredDependencies) {
@@ -147,7 +158,7 @@ public class DownloadModule {
         Matcher matcher = validUrlPatterns.matcher(url);
 
         if (!matcher.matches()) {
-            context.replyEphemeral("Invalid URL. Try removing any extra parameters.");
+            context.replyEphemeral("Invalid URL.\n\nSupported platforms:\nYouTube, Twitter, Instagram, TikTok and Reddit");
             return;
         }
 
