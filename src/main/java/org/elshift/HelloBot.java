@@ -6,6 +6,7 @@ import net.dv8tion.jda.api.events.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.elshift.commands.CommandBuilder;
 import org.elshift.commands.CommandHandler;
+import org.elshift.modules.BloonsCodeModule;
 import org.elshift.modules.DownloadModule;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -26,6 +27,7 @@ public class HelloBot extends ListenerAdapter {
 
             jda = JDABuilder.createDefault(token)
                     .addEventListeners(this, commandHandler)
+                    .addEventListeners(new BloonsCodeModule())
                     .build();
 
             jda.awaitReady();
