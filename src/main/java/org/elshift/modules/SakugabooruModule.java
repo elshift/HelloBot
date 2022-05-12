@@ -79,7 +79,7 @@ public class SakugabooruModule extends ListenerAdapter implements ModuleHelp {
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
         String contents = event.getMessage().getContentDisplay();
 
-        final String[] prefixes = { "$s", "$sakuga", "/sakuga tags:", "/sakuga" };
+        final String[] prefixes = { "$sakuga tags:", "$sakuga", "$s tags:", "$s", "/sakuga tags:", "/sakuga" };
         String foundPrefix = null;
         for (String prefix : prefixes) {
             if (contents.startsWith(prefix)) {
