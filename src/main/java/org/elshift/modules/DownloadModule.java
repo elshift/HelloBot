@@ -169,6 +169,7 @@ public class DownloadModule {
         logger.debug("Attempting to download: {}", url);
 
         context.event().deferReply().queue();
+
         try {
             Path destination = Path.of(Config.get().downloadDir(), "%s.mp4".formatted(Instant.now().toEpochMilli()));
             File downloadedFile = download(destination, url);

@@ -11,9 +11,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.HttpsURLConnection;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -24,9 +27,22 @@ public class SakugabooruModule {
     private static final String MOEBOORU_API = "https://sakugabooru.com";
     private static final Logger logger = LoggerFactory.getLogger(SakugabooruModule.class);
 
+    private SakugabooruPost[] getPosts(Set<String> tags) throws IOException {
+        String tagsParameter = URLEncoder.encode(String.join(" ", tags), StandardCharsets.UTF_8);
+        URL url = new URL("%s/post.json?limit=1&tags=%s".formatted(MOEBOORU_API, tagsParameter));
+        HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+        try (InputStream stream = conn.getInputStream()) {
+            try (InputStreamReader reader = new InputStreamReader(stream)) {
+                return new Gson().fromJson(reader, SakugabooruPost[].class);
+            }
+        }
+    }
+
     @SlashCommand(name = "sakuga", description = "Search Sakugabooru with tags")
     @RunMode(RunMode.Mode.Async)
-    public void sakuga(CommandContext context, @Option(name = "tags") String search) {
+    public void searchSakuga(CommandContext context, @Option(name = "tags") String search) {
+        context.event().deferReply().queue();
+
         Set<String> tags = Arrays.stream(search.split(" ")).collect(Collectors.toSet());
 
         boolean hasOrder = false;
@@ -41,14 +57,7 @@ public class SakugabooruModule {
             tags.add("order:random");
 
         try {
-            URL url = new URL("%s/post.json?limit=1&tags=%s".formatted(MOEBOORU_API, String.join("%20", tags)));
-
-            HttpsURLConnection conn = (HttpsURLConnection)url.openConnection();
-            InputStream is = conn.getInputStream();
-            InputStreamReader sr = new InputStreamReader(is);
-
-            Gson gson = new Gson();
-            SakugabooruPost[] posts = gson.fromJson(sr, SakugabooruPost[].class);
+            SakugabooruPost[] posts = getPosts(tags);
 
             if (posts.length <= 0) {
                 context.hook()
@@ -58,16 +67,17 @@ public class SakugabooruModule {
             }
 
             SakugabooruPost post = posts[0];
-            String details = "Url: %s\nSearch: %s\nTags: %s\nFile: %s".formatted(
-                    "%s/posts/show/%d".formatted(MOEBOORU_API, post.getId()),
-                    search,
-                    post.getTags(),
-                    post.getFileUrl()
-            );
 
-            context.event().reply(details).queue();
+            String postUrl = "%s/post/show/%d".formatted(MOEBOORU_API, post.getId());
 
-            //"http://www.sakugabooru.com/post.xml?tags=spencer_wan%20order:random&limit=1";
+            String message = """
+                    **URL**: <%s>
+                    **Search**: %s
+                    **Tags**: %s
+                    %s
+                    """.formatted(postUrl, search, String.join(", ", tags), post.getFileUrl());
+
+            context.hook().sendMessage(message).queue();
         } catch (Exception e) {
             logger.error("Failed to search %s".formatted(MOEBOORU_API), e);
             context.hook()
