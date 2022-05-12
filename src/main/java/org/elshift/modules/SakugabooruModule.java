@@ -41,14 +41,15 @@ public class SakugabooruModule extends ListenerAdapter implements ModuleHelp {
                 
                 **Basic searching:**
                 - Find a random post: `/sakuga`
-                - Anything with Spencer Wan: `/sakuga spencer_wan`
-                - Anything with Spencer Wan's character acting: `/sakuga spencer_wan character_acting`
-                - Anything with Spencer Wan __*or*__ character acting: `/sakuga ~spencer_wan ~character_acting`
-                :grey_exclamation: Tags cannot have spaces. Use underscores (`spencer wan` -> `spencer_wan`)
+                - Posts with Spencer Wan: `/sakuga spencer_wan`
+                - Must have Spencer Wan __*and*__ character acting: `/sakuga spencer_wan character_acting`
+                - May have Spencer Wan __*and/or*__ character acting: `/sakuga ~spencer_wan ~character_acting`
+                :grey_exclamation: Tags cannot have spaces! Use underscores (`spencer wan` -> `spencer_wan`)
                 
                 **Advanced searching:**
-                - A completely random post: `/sakuga order:random`
-                - Any posts with a score over 100: `/sakuga score:>100`
+                - The highest-scoring post: `/sakuga order:score`
+                - Posts with a score over 100: `/sakuga score:>100`
+                - Posts of Boruto episode #217: `/sakuga boruto:_naruto_next_generations source:#217`
                 
                 :speech_left: **Did you know...**
                 You can also use `$s` or `$sakuga` as a shortcut (and it works in my DMs!)
@@ -58,7 +59,6 @@ public class SakugabooruModule extends ListenerAdapter implements ModuleHelp {
     @SlashCommand(name = "sakuga", description = "Search Sakugabooru")
     @RunMode(RunMode.Mode.Async)
     public void searchSakuga(CommandContext context, @Option(name = "tags", required = false) String rawTags) {
-
         Set<String> tags = createSimplifiedTags(rawTags);
         try {
             SakugabooruPost[] posts = fetchPosts(tags);
@@ -100,9 +100,10 @@ public class SakugabooruModule extends ListenerAdapter implements ModuleHelp {
             String msg = (posts.length > 0) ? formatSearchedPost(posts[0], tags) : formatEmptySearchResults(tags);
             event.getMessage().reply(msg).queue();
         } catch (Exception e) {
-            logger.error("Failed to search %s".formatted(MOEBOORU_API), e);
-            if (!(e instanceof InsufficientPermissionException))
+            if (!(e instanceof InsufficientPermissionException)) { // Ignore permission errors. Not our problem.
+                logger.error("Failed to search %s".formatted(MOEBOORU_API), e);
                 event.getMessage().reply("Failed to search: " + e.getMessage()).queue();
+            }
         }
     }
 
