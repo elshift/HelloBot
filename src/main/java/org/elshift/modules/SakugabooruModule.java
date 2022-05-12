@@ -75,7 +75,8 @@ public class SakugabooruModule {
                     **Search**: %s
                     **Tags**: %s
                     %s
-                    """.formatted(postUrl, search, String.join(", ", tags), post.getFileUrl());
+                    """.formatted(postUrl, String.join(" ", tags), post.getTags(), post.getFileUrl());
+            message = message.replace("@", "\\@");
 
             context.hook().sendMessage(message).queue();
         } catch (Exception e) {
