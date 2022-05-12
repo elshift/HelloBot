@@ -1,7 +1,7 @@
 package org.elshift.commands;
 
-import org.elshift.commands.annotations.RunMode;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
@@ -10,6 +10,7 @@ import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import org.elshift.commands.annotations.RunMode;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,13 +38,13 @@ public class CommandHandler extends ListenerAdapter {
     private void registerCommandsForGuild(Guild guild) {
         List<SlashCommandData> slashCommands = new ArrayList<>();
 
-        for(CommandInfo commandInfo : commands) {
+        for (CommandInfo commandInfo : commands) {
             SlashCommandData command = Commands.slash(
                     commandInfo.getCommand().name(),
                     commandInfo.getCommand().description()
             );
 
-            if(commandInfo.getOptions() != null)
+            if (commandInfo.getOptions() != null)
                 command.addOptions(commandInfo.getOptions());
 
             slashCommands.add(command);
@@ -51,12 +52,12 @@ public class CommandHandler extends ListenerAdapter {
 
         List<Command> registeredCommands = guild.retrieveCommands().complete();
 
-        for(Command command : registeredCommands) {
+        for (Command command : registeredCommands) {
             // TODO: support more types of commands
-            if(command.getType() != Command.Type.SLASH)
+            if (command.getType() != Command.Type.SLASH)
                 continue;
 
-            if(slashCommands.stream().noneMatch((info) -> info.getName().equals(command.getName()))) {
+            if (slashCommands.stream().noneMatch((info) -> info.getName().equals(command.getName()))) {
                 logger.info("Removing old command: " + command.getName());
                 command.delete().queue();
             }
@@ -64,6 +65,14 @@ public class CommandHandler extends ListenerAdapter {
 
         guild.updateCommands().addCommands(slashCommands).queue();
         logger.info("Registered {} command(s) for guild: {}", slashCommands.size(), guild.getName());
+    }
+
+    private void tryRegisterCommandsForGuild(Guild guild) {
+        try {
+            registerCommandsForGuild(guild);
+        } catch (ErrorResponseException e) {
+            logger.warn("Failed to create commands for guild: %s".formatted(guild.getName()));
+        }
     }
 
     /**
@@ -83,7 +92,7 @@ public class CommandHandler extends ListenerAdapter {
             }
         };
 
-        if(commandInfo.getRunMode() == RunMode.Mode.Async)
+        if (commandInfo.getRunMode() == RunMode.Mode.Async)
             asynchronousExecutor.execute(invoke);
         else
             synchronousExecutor.execute(invoke);
@@ -91,11 +100,12 @@ public class CommandHandler extends ListenerAdapter {
 
     @Override
     public void onGuildReady(@NotNull GuildReadyEvent event) {
-        try {
-            registerCommandsForGuild(event.getGuild());
-        } catch (ErrorResponseException e) {
-            logger.warn("Failed to create commands for guild: %s".formatted(event.getGuild().getName()));
-        }
+        tryRegisterCommandsForGuild(event.getGuild());
+    }
+
+    @Override
+    public void onGuildJoin(@NotNull GuildJoinEvent event) {
+        tryRegisterCommandsForGuild(event.getGuild());
     }
 
     @Override
@@ -103,7 +113,7 @@ public class CommandHandler extends ListenerAdapter {
         List<CommandInfo> list = commands.stream().filter(info -> info.matchesEvent(event)).toList();
 
         // Sanity check
-        if(list.isEmpty()) {
+        if (list.isEmpty()) {
             event.reply("That command does not exist!").queue();
             return;
         }
