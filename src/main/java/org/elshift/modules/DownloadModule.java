@@ -1,15 +1,16 @@
 package org.elshift.modules;
 
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import org.elshift.commands.CommandContext;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.RunMode;
 import org.elshift.commands.annotations.SlashCommand;
-import org.elshift.commands.CommandContext;
 import org.elshift.config.Config;
-import org.elshift.modules.annotations.CommandModule;
+import org.elshift.modules.annotations.ModuleProperties;
+import org.elshift.util.TemporaryFileUploader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.elshift.util.TemporaryFileUploader;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,8 +23,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@CommandModule
-public class DownloadModule {
+@ModuleProperties(name = "downloader", useSlashCommands = true)
+public class DownloadModule extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(DownloadModule.class);
 
     // Matches a YouTube, Instagram, Twitter, Reddit, or TikTok post url

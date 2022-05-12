@@ -140,6 +140,7 @@ public class CommandBuilder {
         CommandGroup commandGroup = klass.getClass().getAnnotation(CommandGroup.class);
 
         for (Method method : klass.getClass().getDeclaredMethods()) {
+            // FIXME: Somewhere here, the instance's constructor gets called again, leaving 2 simultaneous instances running
             addMethod(method, commandGroup);
         }
 
