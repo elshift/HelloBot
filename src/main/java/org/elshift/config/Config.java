@@ -15,6 +15,7 @@ public class Config implements Serializable {
     private static final transient Config instance = load("config.json");
 
     private String token;
+    private String activity;
     private String downloadDir;
     private HashSet<String> whitelist;
 
@@ -22,6 +23,7 @@ public class Config implements Serializable {
         Config config = new Config();
         config.token = "YOUR_TOKEN";
         config.downloadDir = "downloads/";
+        config.activity = "";
         config.whitelist = new HashSet<String>();
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -56,6 +58,9 @@ public class Config implements Serializable {
     }
     public String downloadDir() {
         return downloadDir;
+    }
+    public String activity() {
+        return activity;
     }
 
     public HashSet<String> getWhitelist() {
