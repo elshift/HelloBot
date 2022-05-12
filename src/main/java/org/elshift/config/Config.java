@@ -1,11 +1,14 @@
 package org.elshift.config;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.Serializable;
+import java.util.HashSet;
 
 public class Config implements Serializable {
     private static final transient Logger logger = LoggerFactory.getLogger(Config.class);
@@ -13,13 +16,15 @@ public class Config implements Serializable {
 
     private String token;
     private String downloadDir;
+    private HashSet<String> whitelist;
 
     private static void saveDefault(String path) {
         Config config = new Config();
         config.token = "YOUR_TOKEN";
         config.downloadDir = "downloads/";
+        config.whitelist = new HashSet<String>();
 
-        Gson gson = new Gson();
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try(FileWriter writer = new FileWriter(path)) {
             writer.write(gson.toJson(config));
         } catch(Exception e) {
@@ -51,5 +56,9 @@ public class Config implements Serializable {
     }
     public String downloadDir() {
         return downloadDir;
+    }
+
+    public HashSet<String> getWhitelist() {
+        return whitelist;
     }
 }

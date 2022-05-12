@@ -5,6 +5,7 @@ import org.elshift.commands.annotations.RunMode;
 import org.elshift.commands.annotations.SlashCommand;
 import org.elshift.commands.CommandContext;
 import org.elshift.config.Config;
+import org.elshift.modules.annotations.CommandModule;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@CommandModule
 public class DownloadModule {
     private static final Logger logger = LoggerFactory.getLogger(DownloadModule.class);
 

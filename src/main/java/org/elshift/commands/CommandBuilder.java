@@ -136,10 +136,10 @@ public class CommandBuilder {
      * @return
      *  Self
      */
-    public CommandBuilder addModule(@NotNull Class<?> klass) {
-        CommandGroup commandGroup = klass.getAnnotation(CommandGroup.class);
+    public CommandBuilder addModule(@NotNull Object klass) {
+        CommandGroup commandGroup = klass.getClass().getAnnotation(CommandGroup.class);
 
-        for (Method method : klass.getDeclaredMethods()) {
+        for (Method method : klass.getClass().getDeclaredMethods()) {
             addMethod(method, commandGroup);
         }
 
