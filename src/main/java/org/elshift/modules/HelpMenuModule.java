@@ -27,7 +27,7 @@ public class HelpMenuModule extends ListenerAdapter {
 
     @SlashCommand(name = "help", description = "Learn how to use HelloBot")
     @RunMode(RunMode.Mode.Async)
-    public void helpSelect(CommandContext context, @Option(name = "module", required = false) String moduleName) {
+    public void helpSelect(CommandContext context, @Option(name = "topic", required = false) String moduleName) {
         String msg;
         if (moduleName == null)
             msg = formatActiveModules();

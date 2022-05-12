@@ -2,6 +2,7 @@ package org.elshift.modules;
 
 import com.google.gson.Gson;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.elshift.commands.CommandContext;
 import org.elshift.commands.annotations.Option;
@@ -100,7 +101,8 @@ public class SakugabooruModule extends ListenerAdapter implements ModuleHelp {
             event.getMessage().reply(msg).queue();
         } catch (Exception e) {
             logger.error("Failed to search %s".formatted(MOEBOORU_API), e);
-            event.getMessage().reply("Failed to search: " + e.getMessage()).queue();
+            if (!(e instanceof InsufficientPermissionException))
+                event.getMessage().reply("Failed to search: " + e.getMessage()).queue();
         }
     }
 
