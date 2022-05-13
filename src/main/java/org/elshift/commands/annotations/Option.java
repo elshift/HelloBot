@@ -15,6 +15,8 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Option {
     @NotNull String name();
+
     String description() default "";
+
     boolean required() default true;
 }

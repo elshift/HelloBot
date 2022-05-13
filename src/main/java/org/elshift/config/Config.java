@@ -11,8 +11,8 @@ import java.io.Serializable;
 import java.util.HashSet;
 
 public class Config implements Serializable {
-    private static final transient Logger logger = LoggerFactory.getLogger(Config.class);
-    private static final transient Config instance = load("config.json");
+    private static final Logger logger = LoggerFactory.getLogger(Config.class);
+    private static final Config instance = load("config.json");
 
     private String token;
     private String activity;
@@ -24,12 +24,12 @@ public class Config implements Serializable {
         config.token = "YOUR_TOKEN";
         config.downloadDir = "downloads/";
         config.activity = "";
-        config.whitelist = new HashSet<String>();
+        config.whitelist = new HashSet<>();
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try(FileWriter writer = new FileWriter(path)) {
+        try (FileWriter writer = new FileWriter(path)) {
             writer.write(gson.toJson(config));
-        } catch(Exception e) {
+        } catch (Exception e) {
             logger.error("Failed to write config file: %s".formatted(path), e);
         }
     }
@@ -38,7 +38,7 @@ public class Config implements Serializable {
         Config result = null;
         Gson gson = new Gson();
 
-        try(FileReader reader = new FileReader(configPath)) {
+        try (FileReader reader = new FileReader(configPath)) {
             result = gson.fromJson(reader, Config.class);
         } catch (Exception e) {
             logger.info("Failed to load config, creating default. You need to edit config.json to include the bot token.");
@@ -56,9 +56,11 @@ public class Config implements Serializable {
     public String token() {
         return token;
     }
+
     public String downloadDir() {
         return downloadDir;
     }
+
     public String activity() {
         return activity;
     }

@@ -7,5 +7,8 @@ public record CommandContext(SlashCommandInteractionEvent event) {
     public void replyEphemeral(String message) {
         event.reply(message).setEphemeral(true).queue();
     }
-    public InteractionHook hook() { return event.getHook(); }
+
+    public InteractionHook hook() {
+        return event.getHook();
+    }
 }

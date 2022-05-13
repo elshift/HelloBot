@@ -86,9 +86,8 @@ public class CommandHandler extends ListenerAdapter {
             try {
                 commandInfo.invoke(context, args);
             } catch (Exception e) {
-                logger.error("Failed to collect arguments for command {}", commandInfo.getCommand().name(), e);
+                logger.error("Failed to execute command {}", commandInfo.getCommand().name(), e);
                 event.reply("Failed to execute command!").setEphemeral(true).queue();
-                e.printStackTrace();
             }
         };
 
@@ -96,6 +95,10 @@ public class CommandHandler extends ListenerAdapter {
             asynchronousExecutor.execute(invoke);
         else
             synchronousExecutor.execute(invoke);
+    }
+
+    public List<CommandInfo> getCommands() {
+        return commands;
     }
 
     @Override

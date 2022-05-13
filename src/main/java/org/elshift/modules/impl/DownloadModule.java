@@ -1,4 +1,4 @@
-package org.elshift.modules;
+package org.elshift.modules.impl;
 
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.elshift.commands.CommandContext;
@@ -6,7 +6,7 @@ import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.RunMode;
 import org.elshift.commands.annotations.SlashCommand;
 import org.elshift.config.Config;
-import org.elshift.modules.annotations.ModuleProperties;
+import org.elshift.modules.Module;
 import org.elshift.util.TemporaryFileUploader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -23,8 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@ModuleProperties(name = "downloader", useSlashCommands = true)
-public class DownloadModule extends ListenerAdapter {
+public class DownloadModule extends ListenerAdapter implements Module {
     private static final Logger logger = LoggerFactory.getLogger(DownloadModule.class);
 
     // Matches a YouTube, Instagram, Twitter, Reddit, or TikTok post url
@@ -64,7 +63,7 @@ public class DownloadModule extends ListenerAdapter {
     private static void purgeOldFiles() {
         try {
             for (File file : Objects.requireNonNull(downloadsDir.listFiles())) {
-                if(!file.isDirectory() && !file.canExecute()
+                if (!file.isDirectory() && !file.canExecute()
                         && Instant.now().toEpochMilli() - file.lastModified() > (120 * 1000))
                     if (!file.delete() && file.exists()) {
                         logger.error("Failed to delete old file {}.", file.getName());
@@ -96,15 +95,15 @@ public class DownloadModule extends ListenerAdapter {
         boolean isWindows = osName.contains("win");
 
         Path installBin = isLinux ? YT_DLP_BIN_LINUX : isWindows ? YT_DLP_BIN_WINDOWS : null;
-        if(installBin == null) {
+        if (installBin == null) {
             logger.error("Make sure both ffmpeg and yt-dlp are installed. " +
                     "You need to symlink the path to your yt-dlp install to %s".formatted(YT_DLP_BIN));
             return;
         }
 
-        if(Files.exists(installBin)) {
+        if (Files.exists(installBin)) {
             logger.info("Found yt-dlp: {}", installBin);
-            if(isLinux)
+            if (isLinux)
                 Files.createSymbolicLink(YT_DLP_BIN, YT_DLP_BIN_LINUX);
             else // Windows
                 YT_DLP_BIN = YT_DLP_BIN_WINDOWS;
@@ -117,12 +116,10 @@ public class DownloadModule extends ListenerAdapter {
 
     /**
      * Attempts to download media from given url and attempts to save the result to destination.
-     * @param destination
-     *  Destination path for downloaded media
-     * @param url
-     *  URL to fetch media from
-     * @return
-     *  The downloaded media
+     *
+     * @param destination Destination path for downloaded media
+     * @param url         URL to fetch media from
+     * @return The downloaded media
      */
     private static File download(@NotNull Path destination, String url) throws IOException, InterruptedException {
         purgeOldFiles();
@@ -133,7 +130,7 @@ public class DownloadModule extends ListenerAdapter {
         File file = new File(destination.toString());
 
         // Just in case
-        if(!file.exists()) {
+        if (!file.exists()) {
             String fileName = destination.getFileName().toString();
             int periodIdx = fileName.lastIndexOf('.');
             String fileNameNoExt = fileName.substring(0, periodIdx);
@@ -141,7 +138,7 @@ public class DownloadModule extends ListenerAdapter {
 
             File[] files = downloadsDir.listFiles((dir, name) ->
                     name.contains(fileNameNoExt) && name.contains(extension));
-            if(files == null || files.length == 0)
+            if (files == null || files.length == 0)
                 throw new IOException("Failed to find file");
 
             file = files[0];
@@ -153,7 +150,7 @@ public class DownloadModule extends ListenerAdapter {
     @SlashCommand(name = "download", description = "Download a video from YouTube, Twitter, Instagram, TikTok, or Reddit")
     @RunMode(RunMode.Mode.Async)
     public void downloadVideo(CommandContext context, @Option(name = "url", description = "post url") String url) {
-        if(!hasRequiredDependencies) {
+        if (!hasRequiredDependencies) {
             context.replyEphemeral("Missing dependencies: ffmpeg + yt-dlp. Check log for more info.");
             return;
         }
@@ -178,7 +175,7 @@ public class DownloadModule extends ListenerAdapter {
             long fileSize = downloadedFile.length();
             long maxFileSize = 1024 * 1024 * 8;
 
-            if(context.event().isFromGuild())
+            if (context.event().isFromGuild())
                 maxFileSize = Objects.requireNonNull(context.event().getGuild()).getMaxFileSize();
 
             // File is small enough to upload directly to Discord
@@ -189,7 +186,7 @@ public class DownloadModule extends ListenerAdapter {
 
             String remoteUrl = TemporaryFileUploader.uploadAndGetURL(downloadedFile);
             context.hook().sendMessage(remoteUrl).queue(m -> removalQueue.add(downloadedFile));
-        } catch(InterruptedException e) {
+        } catch (InterruptedException e) {
             context.hook()
                     .sendMessage("Your video took too long to download!")
                     .setEphemeral(true).queue();
@@ -199,5 +196,20 @@ public class DownloadModule extends ListenerAdapter {
                     .sendMessage("Failed to download video (image only posts aren't supported on all platforms).")
                     .setEphemeral(true).queue();
         }
+    }
+
+    @Override
+    public String getName() {
+        return "download";
+    }
+
+    @Override
+    public String getHelpMessage() {
+        return "Downloads videos from social media websites";
+    }
+
+    @Override
+    public boolean usesSlashCommands() {
+        return true;
     }
 }

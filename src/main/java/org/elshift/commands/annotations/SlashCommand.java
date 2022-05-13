@@ -14,5 +14,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SlashCommand {
     @NotNull String name();
+
     @NotNull String description();
 }

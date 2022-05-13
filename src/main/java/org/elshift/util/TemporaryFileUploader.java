@@ -21,13 +21,12 @@ public class TemporaryFileUploader {
 
     /**
      * Uploads a file to the temporary file hosting service.
-     * @param file
-     *  The file to upload
-     * @return
-     *  The URL returned by the server
+     *
+     * @param file The file to upload
+     * @return The URL returned by the server
      */
     public static String uploadAndGetURL(File file) throws IOException {
-        try(CloseableHttpClient client = HttpClients.createDefault()) {
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpUriRequest request = RequestBuilder.put(UPLOAD_URL + file.getName())
                     .setEntity(new FileEntity(file))
                     .build();
