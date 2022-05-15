@@ -2,11 +2,12 @@ package org.elshift.modules.impl;
 
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.commands.Command;
 import org.elshift.Main;
 import org.elshift.commands.CommandContext;
-import org.elshift.commands.CommandInfo;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.options.MultipleChoiceOption;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
 
@@ -18,12 +19,12 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
     }
 
     @SlashCommand(name = "help", description = "Learn how to use HelloBot")
-    public void helpSelect(CommandContext context, @Option(name = "topic", required = false) String moduleName) {
+    public void help(CommandContext context, @Option(name = "topic", required = false) ModuleNameOption moduleName) {
         String msg;
         if (moduleName == null)
             msg = formatActiveModules();
         else
-            msg = formatRequestedModule(moduleName);
+            msg = formatRequestedModule(moduleName.get());
 
         context.replyEphemeral(msg);
     }
@@ -55,8 +56,7 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
     }
 
     private String formatRequestedModule(String moduleName) {
-        Optional<Module> optionalModule = Main.getBot().getCommandHandler().getCommands().stream()
-                .map(CommandInfo::getModule)
+        Optional<Module> optionalModule = Main.getBot().getActiveModules().stream()
                 .filter(module -> module.getName().equals(moduleName))
                 .findFirst();
 
@@ -73,8 +73,7 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
     }
 
     private String formatActiveModules() {
-        List<String> moduleNames = Main.getBot().getCommandHandler().getCommands()
-                .stream().map(CommandInfo::getModule).map(Module::getName).toList();
+        List<String> moduleNames = Main.getBot().getActiveModules().stream().map(Module::getName).toList();
 
         StringBuilder messageBuilder = new StringBuilder("Learn about any enabled features:\n```");
 
@@ -100,5 +99,20 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
     @Override
     public boolean usesSlashCommands() {
         return true;
+    }
+
+    private static class ModuleNameOption extends MultipleChoiceOption<String> {
+        @Override
+        public Class<?> getType() {
+            return String.class;
+        }
+
+        @Override
+        public @NotNull Command.Choice[] getChoices() {
+            return Main.getBot().getActiveModules().stream()
+                    .map(Module::getName)
+                    .map(name -> new Command.Choice(name, name))
+                    .toArray(Command.Choice[]::new);
+        }
     }
 }

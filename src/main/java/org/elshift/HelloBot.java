@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -22,6 +23,7 @@ public class HelloBot extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(HelloBot.class);
     private JDA jda;
     private CommandHandler commandHandler;
+    private final List<Module> activeModules = new ArrayList<>();
 
     public void createBot(String[] args, String token) {
         try {
@@ -58,6 +60,9 @@ public class HelloBot extends ListenerAdapter {
             if (!Module.class.isAssignableFrom(klass))
                 continue;
 
+            if (klass.isInterface())
+                continue;
+
             String klassName = klass.getSimpleName();
 
             if (hasWhitelist && !whitelist.contains(klassName))
@@ -74,6 +79,8 @@ public class HelloBot extends ListenerAdapter {
                 jdaBuilder.addEventListeners(moduleInstance);
                 logger.debug("Added event listener module: {}", klassName);
             }
+
+            activeModules.add(moduleInstance);
         }
     }
 
@@ -84,6 +91,10 @@ public class HelloBot extends ListenerAdapter {
 
     public CommandHandler getCommandHandler() {
         return commandHandler;
+    }
+
+    public List<Module> getActiveModules() {
+        return activeModules;
     }
 
     @Override

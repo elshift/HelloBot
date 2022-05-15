@@ -6,7 +6,6 @@ import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.elshift.commands.CommandContext;
 import org.elshift.commands.annotations.Option;
-import org.elshift.commands.annotations.RunMode;
 import org.elshift.commands.annotations.SlashCommand;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
@@ -31,39 +30,11 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
     private static final Logger logger = LoggerFactory.getLogger(SakugabooruModule.class);
 
     @Override
-    public String getHelpMessage() {
-        return """
-                Sakugabooru tips!
-                                
-                **Basic searching:**
-                - Find a random post: `/sakuga`
-                - Posts with Spencer Wan: `/sakuga spencer_wan`
-                - Must have Spencer Wan __*and*__ character acting: `/sakuga spencer_wan character_acting`
-                - May have Spencer Wan __*and/or*__ character acting: `/sakuga ~spencer_wan ~character_acting`
-                :grey_exclamation: Tags cannot have spaces! Use underscores (`spencer wan` -> `spencer_wan`)
-                                
-                **Advanced searching:**
-                - The highest-scoring post: `/sakuga order:score`
-                - Posts with a score over 100: `/sakuga score:>100`
-                - Posts of Boruto episode #217: `/sakuga boruto:_naruto_next_generations source:#217`
-                                
-                :speech_left: **Did you know...**
-                You can also use `$s` or `$sakuga` as a shortcut (and it works in my DMs!)
-                """;
-    }
-
-    @Override
     public boolean usesSlashCommands() {
         return true;
     }
 
-    @Override
-    public String getName() {
-        return "sakuga";
-    }
-
     @SlashCommand(name = "sakuga", description = "Search Sakugabooru")
-    @RunMode(RunMode.Mode.Async)
     public void searchSakuga(CommandContext context, @Option(name = "tags", required = false) String rawTags) {
         Set<String> tags = createSimplifiedTags(rawTags);
         try {
@@ -231,5 +202,32 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
                 return new Gson().fromJson(reader, classOfT);
             }
         }
+    }
+
+    @Override
+    public String getName() {
+        return "sakuga";
+    }
+
+    @Override
+    public String getHelpMessage() {
+        return """
+                Sakugabooru tips!
+                                
+                **Basic searching:**
+                - Find a random post: `/sakuga`
+                - Posts with Spencer Wan: `/sakuga spencer_wan`
+                - Must have Spencer Wan __*and*__ character acting: `/sakuga spencer_wan character_acting`
+                - May have Spencer Wan __*and/or*__ character acting: `/sakuga ~spencer_wan ~character_acting`
+                :grey_exclamation: Tags cannot have spaces! Use underscores (`spencer wan` -> `spencer_wan`)
+                                
+                **Advanced searching:**
+                - The highest-scoring post: `/sakuga order:score`
+                - Posts with a score over 100: `/sakuga score:>100`
+                - Posts of Boruto episode #217: `/sakuga boruto:_naruto_next_generations source:#217`
+                                
+                :speech_left: **Did you know...**
+                You can also use `$s` or `$sakuga` as a shortcut (and it works in my DMs!)
+                """;
     }
 }

@@ -6,7 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Specified the executing mode for commands.
+ * Specifies the executing mode for commands.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -16,5 +16,5 @@ public @interface RunMode {
         Async
     }
 
-    Mode value() default Mode.Sync;
+    Mode value();
 }

@@ -1,14 +1,24 @@
 package org.elshift.commands;
 
 import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import org.elshift.commands.annotations.*;
+import org.elshift.commands.annotations.CommandGroup;
+import org.elshift.commands.annotations.Option;
+import org.elshift.commands.annotations.RunMode;
+import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.annotations.choice.*;
+import org.elshift.commands.options.MultipleChoiceOption;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
@@ -19,10 +29,12 @@ import java.util.Map;
 /**
  * Helper class to make adding slash commands easier.
  */
+@SuppressWarnings("UnusedReturnValue")
 public class CommandBuilder {
+    private static final Logger logger = LoggerFactory.getLogger(CommandBuilder.class);
     private final List<CommandInfo> commandInfoList = new ArrayList<>();
 
-    private static final Map<Class<?>, OptionType> typeMap = new HashMap<>() {{
+    private static final Map<Class<?>, OptionType> TYPE_MAP = new HashMap<>() {{
         put(String.class, OptionType.STRING);
         put(Integer.class, OptionType.INTEGER);
         put(Boolean.class, OptionType.BOOLEAN);
@@ -36,25 +48,75 @@ public class CommandBuilder {
         put(Message.Attachment.class, OptionType.ATTACHMENT);
     }};
 
-    private @NotNull OptionData getParameterOptionData(@NotNull Parameter parameter) {
-        if (!typeMap.containsKey(parameter.getType()))
-            throw new InvalidParameterException("Unknown parameter type: " + parameter.getType().getName());
+    private void populateOptionChoices(OptionData optionData, Parameter parameter) {
+        StringChoices stringChoices = parameter.getAnnotation(StringChoices.class);
+        if (stringChoices != null) {
+            for (StringChoice stringChoice : stringChoices.value())
+                optionData.addChoice(stringChoice.name(), stringChoice.value());
+            return;
+        }
 
-        OptionType optionType = typeMap.get(parameter.getType());
+        LongChoices longChoices = parameter.getAnnotation(LongChoices.class);
+        if (longChoices != null) {
+            for (LongChoice longChoice : longChoices.value())
+                optionData.addChoice(longChoice.name(), longChoice.value());
+            return;
+        }
+
+        DoubleChoices doubleChoices = parameter.getAnnotation(DoubleChoices.class);
+        if (doubleChoices != null) {
+            for (DoubleChoice doubleChoice : doubleChoices.value())
+                optionData.addChoice(doubleChoice.name(), doubleChoice.value());
+        }
+    }
+
+    private @NotNull OptionData getParameterOptionData(Module module, @NotNull Parameter parameter) {
+        Class<?> paramType = parameter.getType();
+        OptionType optionType = TYPE_MAP.get(parameter.getType());
+
+        Command.Choice[] choices = null;
+
+        if (paramType.isEnum()) {
+            Object[] enumConstants = paramType.getEnumConstants();
+            choices = new Command.Choice[enumConstants.length];
+            for (int i = 0; i < enumConstants.length; i++)
+                choices[i] = new Command.Choice(enumConstants[i].toString(), i);
+            optionType = OptionType.INTEGER;
+        } else if (MultipleChoiceOption.class.isAssignableFrom(paramType)) {
+            try {
+                MultipleChoiceOption<?> multipleChoice;
+
+                // Non-static nested classes' constructors require an owning class instance parameter
+                if (paramType.isMemberClass() && (paramType.getModifiers() & Modifier.STATIC) == 0) {
+                    Constructor<?> constructor = paramType.getDeclaredConstructor(module.getClass());
+                    constructor.setAccessible(true);
+                    multipleChoice = (MultipleChoiceOption<?>) constructor.newInstance(module);
+                } else {
+                    Constructor<?> constructor = paramType.getDeclaredConstructor();
+                    constructor.setAccessible(true);
+                    multipleChoice = (MultipleChoiceOption<?>) constructor.newInstance();
+                }
+
+                optionType = TYPE_MAP.get(multipleChoice.getType());
+                choices = multipleChoice.getChoices();
+            } catch (Exception e) {
+                logger.error("Failed to instantiate multiple choice parameter", e);
+            }
+        }
+
         Option option = parameter.getAnnotation(Option.class);
 
-        if (option != null) {
-            String name = option.name();
-            String description = option.description().isEmpty() ? name : option.description();
-            boolean required = option.required();
+        String name = option.name();
+        String description = option.description().isEmpty() ? name : option.description();
+        boolean required = option.required();
 
-            return new OptionData(optionType, name, description, required);
-        } else {
-            Name name = parameter.getAnnotation(Name.class);
-            if (name == null)
-                throw new InvalidParameterException("Can't extract name from command parameter. It must either be annotated with @Option or @Name");
-            return new OptionData(optionType, name.value(), name.value(), true);
-        }
+        OptionData optionData = new OptionData(optionType, name, description, required);
+        populateOptionChoices(optionData, parameter);
+
+        if (choices != null)
+            optionData.addChoices(choices);
+
+        return optionData;
     }
 
     /**
@@ -92,8 +154,7 @@ public class CommandBuilder {
                 continue;
             }
 
-
-            options.add(getParameterOptionData(parameter));
+            options.add(getParameterOptionData(module, parameter));
         }
 
         if (!doesHaveCommandContext)

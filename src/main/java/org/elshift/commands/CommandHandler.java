@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.Command;
+import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
@@ -28,6 +29,7 @@ public class CommandHandler extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(CommandHandler.class);
     private final List<CommandInfo> commands;
 
+    private final List<SlashCommandData> slashCommands = new ArrayList<>();
     private final ExecutorService synchronousExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService asynchronousExecutor = Executors.newCachedThreadPool();
 
@@ -36,18 +38,21 @@ public class CommandHandler extends ListenerAdapter {
     }
 
     private void registerCommandsForGuild(Guild guild) {
-        List<SlashCommandData> slashCommands = new ArrayList<>();
+        if (slashCommands.isEmpty()) {
+            for (CommandInfo commandInfo : commands) {
+                SlashCommandData command = Commands.slash(
+                        commandInfo.getCommand().name(),
+                        commandInfo.getCommand().description()
+                );
 
-        for (CommandInfo commandInfo : commands) {
-            SlashCommandData command = Commands.slash(
-                    commandInfo.getCommand().name(),
-                    commandInfo.getCommand().description()
-            );
+                boolean hasOptions = commandInfo.getOptions() != null && !commandInfo.getOptions().isEmpty();
 
-            if (commandInfo.getOptions() != null)
-                command.addOptions(commandInfo.getOptions());
 
-            slashCommands.add(command);
+                if (hasOptions)
+                    command.addOptions(commandInfo.getOptions());
+
+                slashCommands.add(command);
+            }
         }
 
         List<Command> registeredCommands = guild.retrieveCommands().complete();
@@ -57,7 +62,7 @@ public class CommandHandler extends ListenerAdapter {
             if (command.getType() != Command.Type.SLASH)
                 continue;
 
-            if (slashCommands.stream().noneMatch((info) -> info.getName().equals(command.getName()))) {
+            if (slashCommands.stream().noneMatch(info -> info.getName().equals(command.getName()))) {
                 logger.info("Removing old command: " + command.getName());
                 command.delete().queue();
             }
@@ -97,6 +102,14 @@ public class CommandHandler extends ListenerAdapter {
             synchronousExecutor.execute(invoke);
     }
 
+    private CommandInfo getCommandForEvent(CommandInteractionPayload event) {
+        List<CommandInfo> list = commands.stream().filter(info -> info.matchesEvent(event)).toList();
+        if (list.isEmpty())
+            return null;
+
+        return list.get(0);
+    }
+
     public List<CommandInfo> getCommands() {
         return commands;
     }
@@ -113,14 +126,13 @@ public class CommandHandler extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
-        List<CommandInfo> list = commands.stream().filter(info -> info.matchesEvent(event)).toList();
+        CommandInfo info = getCommandForEvent(event);
 
-        // Sanity check
-        if (list.isEmpty()) {
-            event.reply("That command does not exist!").queue();
+        if (info == null) {
+            event.reply("Command does not exist.").setEphemeral(true).queue();
             return;
         }
 
-        handleCommand(event, list.get(0));
+        handleCommand(event, info);
     }
 }

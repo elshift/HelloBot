@@ -1,4 +1,4 @@
-package org.elshift.commands.annotations;
+package org.elshift.commands.annotations.choice;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -6,12 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Provides information about a slash command.
+ * A list of possible long choices for a slash command parameter.
  */
-@Target(ElementType.METHOD)
+@Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface SlashCommand {
-    String name();
-
-    String description();
+public @interface LongChoices {
+    LongChoice[] value();
 }

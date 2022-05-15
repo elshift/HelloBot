@@ -2,12 +2,13 @@ package org.elshift.commands;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Channel;
-import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import org.elshift.commands.annotations.CommandGroup;
 import org.elshift.commands.annotations.RunMode;
 import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.options.MultipleChoiceOption;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
 
@@ -28,6 +29,7 @@ public final class CommandInfo {
     private final CommandGroup group;
     private final List<OptionData> options;
     private final RunMode.Mode runMode;
+    private final Class<?>[] parameterTypes;
 
     public CommandInfo(
             @NotNull SlashCommand command,
@@ -43,6 +45,7 @@ public final class CommandInfo {
         this.group = group;
         this.options = options;
         this.runMode = runMode == null ? RunMode.Mode.Sync : runMode.value();
+        this.parameterTypes = method.getParameterTypes();
     }
 
     private boolean isSubcommandOf(String group) {
@@ -55,7 +58,7 @@ public final class CommandInfo {
     /**
      * @return Whether the interaction event matches this command
      */
-    public boolean matchesEvent(@NotNull SlashCommandInteractionEvent event) {
+    public boolean matchesEvent(@NotNull CommandInteractionPayload event) {
         if (event.getSubcommandGroup() == null && getGroup() != null)
             return false;
         if (event.getSubcommandGroup() != null && getGroup() == null)
@@ -92,14 +95,27 @@ public final class CommandInfo {
      * @param ctx  The context in which the command was executed
      * @param args The arguments
      */
-    public void invoke(CommandContext ctx, @NotNull List<OptionMapping> args) throws ReflectiveOperationException {
+    public void invoke(@NotNull CommandContext ctx, @NotNull List<OptionMapping> args) throws ReflectiveOperationException {
         // TODO: 5/13/2022 invalid parameter types will throw ReflectiveOperationException, check the types before
         // TODO: 5/13/2022 invocation to provide a better error message
         Object[] arguments = new Object[1 + args.size()];
         arguments[0] = ctx; // ctx is always first
+
         JDA jda = ctx.event().getJDA();
-        for (int i = 0; i < args.size(); i++)
-            arguments[i + 1] = getOptionValue(jda, args.get(i));
+        for (int i = 0; i < args.size(); i++) {
+            Object rawValue = getOptionValue(jda, args.get(i));
+            // Add 1 to skip over ctx
+            Class<?> parameterType = parameterTypes[i + 1];
+
+            if (MultipleChoiceOption.class.isAssignableFrom(parameterType))
+                arguments[i + 1] = MultipleChoiceOption.wrap(parameterType, rawValue);
+            else if (parameterType.isEnum()) {
+                Object[] constants = parameterType.getEnumConstants();
+                arguments[i + 1] = constants[(int) rawValue];
+            } else
+                arguments[i + 1] = rawValue;
+        }
+
         method.invoke(module, arguments);
     }
 
