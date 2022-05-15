@@ -3,9 +3,11 @@ package org.elshift.commands;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.AutoCompleteQuery;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
@@ -18,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -134,5 +137,40 @@ public class CommandHandler extends ListenerAdapter {
         }
 
         handleCommand(event, info);
+    }
+
+    @Override
+    public void onCommandAutoCompleteInteraction(@NotNull CommandAutoCompleteInteractionEvent event) {
+        CommandInfo info = getCommandForEvent(event);
+
+        if (info == null)
+            return;
+
+        List<CustomOptionData> options = info.getOptions();
+        if (options.isEmpty())
+            return;
+
+        AutoCompleteQuery query = event.getFocusedOption();
+
+        Optional<CustomOptionData> first = options.stream()
+                .filter(data -> data.getName().equals(query.getName()))
+                .findFirst();
+
+        if (first.isEmpty())
+            return;
+
+        CustomOptionData currentOption = first.get();
+
+        if (!currentOption.isAutoComplete())
+            return;
+
+        if (currentOption.getAutoCompleteProvider() == null)
+            return;
+
+        Command.Choice[] candidates = currentOption.getAutoCompleteProvider().getCandidates(query);
+        if (candidates == null)
+            return;
+
+        event.replyChoices(candidates).queue();
     }
 }

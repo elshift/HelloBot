@@ -4,7 +4,6 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Channel;
 import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
-import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import org.elshift.commands.annotations.CommandGroup;
 import org.elshift.commands.annotations.RunMode;
 import org.elshift.commands.annotations.SlashCommand;
@@ -21,13 +20,13 @@ import java.util.List;
  * Stores information about a command.
  */
 public final class CommandInfo {
-    private static final List<OptionData> EMPTY_OPTIONS_LIST = new ArrayList<>();
+    private static final List<CustomOptionData> EMPTY_OPTIONS_LIST = new ArrayList<>();
 
     private final @NotNull SlashCommand command;
     private final Module module;
     private final @NotNull Method method;
     private final CommandGroup group;
-    private final List<OptionData> options;
+    private final List<CustomOptionData> options;
     private final RunMode.Mode runMode;
     private final Class<?>[] parameterTypes;
 
@@ -36,7 +35,7 @@ public final class CommandInfo {
             @NotNull Module module,
             @NotNull Method method,
             @Nullable CommandGroup group,
-            @NotNull List<OptionData> options,
+            @NotNull List<CustomOptionData> options,
             @Nullable RunMode runMode
     ) {
         this.command = command;
@@ -144,7 +143,7 @@ public final class CommandInfo {
     /**
      * @return The list of options this command requires
      */
-    public List<OptionData> getOptions() {
+    public List<CustomOptionData> getOptions() {
         return options == null ? EMPTY_OPTIONS_LIST : options;
     }
 

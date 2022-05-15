@@ -187,14 +187,14 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
         );
     }
 
-    private SakugabooruTag[] fetchTags(String name, int limit, SakugabooruTag.Order order) throws IOException {
+    private static SakugabooruTag[] fetchTags(String name, int limit, SakugabooruTag.Order order) throws IOException {
         return fetchJsonObject(
                 "%s/tag.json?limit=%d&order=%s&name=%s".formatted(MOEBOORU_API, limit, order.urlValue, name),
                 SakugabooruTag[].class
         );
     }
 
-    private <T> T fetchJsonObject(String urlString, Class<T> classOfT) throws IOException {
+    private static <T> T fetchJsonObject(String urlString, Class<T> classOfT) throws IOException {
         URL url = new URL(urlString);
         HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
         try (InputStream stream = conn.getInputStream()) {

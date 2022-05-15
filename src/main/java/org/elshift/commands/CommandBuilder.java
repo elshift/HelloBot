@@ -4,11 +4,9 @@ import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import org.elshift.commands.annotations.CommandGroup;
-import org.elshift.commands.annotations.Option;
-import org.elshift.commands.annotations.RunMode;
-import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.annotations.*;
 import org.elshift.commands.annotations.choice.*;
+import org.elshift.commands.autocomplete.AutoCompleteProvider;
 import org.elshift.commands.options.MultipleChoiceOption;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
@@ -70,7 +68,7 @@ public class CommandBuilder {
         }
     }
 
-    private @NotNull OptionData getParameterOptionData(Module module, @NotNull Parameter parameter) {
+    private @NotNull CustomOptionData getParameterOptionData(Module module, @NotNull Parameter parameter) {
         Class<?> paramType = parameter.getType();
         OptionType optionType = TYPE_MAP.get(parameter.getType());
 
@@ -99,7 +97,7 @@ public class CommandBuilder {
 
                 optionType = TYPE_MAP.get(multipleChoice.getType());
                 choices = multipleChoice.getChoices();
-            } catch (Exception e) {
+            } catch (ReflectiveOperationException e) {
                 logger.error("Failed to instantiate multiple choice parameter", e);
             }
         }
@@ -110,11 +108,25 @@ public class CommandBuilder {
         String description = option.description().isEmpty() ? name : option.description();
         boolean required = option.required();
 
-        OptionData optionData = new OptionData(optionType, name, description, required);
+        CustomOptionData optionData = new CustomOptionData(optionType, name, description, required);
         populateOptionChoices(optionData, parameter);
 
         if (choices != null)
             optionData.addChoices(choices);
+
+        AutoComplete autoComplete = parameter.getAnnotation(AutoComplete.class);
+        if (autoComplete != null) {
+            try {
+                Constructor<?> constructor = autoComplete.value().getDeclaredConstructor();
+                constructor.setAccessible(true);
+                AutoCompleteProvider autoCompleteProvider = (AutoCompleteProvider) constructor.newInstance();
+
+                optionData.setAutoComplete(true);
+                optionData.setAutoCompleteProvider(autoCompleteProvider);
+            } catch (ReflectiveOperationException e) {
+                logger.error("Failed to create auto-complete provider", e);
+            }
+        }
 
         return optionData;
     }
@@ -133,7 +145,7 @@ public class CommandBuilder {
         if (slashCommand == null)
             return this;
 
-        List<OptionData> options = new ArrayList<>();
+        List<CustomOptionData> options = new ArrayList<>();
 
         boolean doesHaveCommandContext = false;
         for (int i = 0; i < method.getParameterCount(); i++) {
