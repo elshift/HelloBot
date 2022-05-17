@@ -1,12 +1,12 @@
 package org.elshift.commands;
 
 import net.dv8tion.jda.api.entities.*;
-import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import org.elshift.commands.annotations.*;
 import org.elshift.commands.annotations.choice.*;
 import org.elshift.commands.autocomplete.AutoCompleteProvider;
+import org.elshift.commands.context.CommandContext;
 import org.elshift.commands.options.MultipleChoiceOption;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
@@ -72,13 +72,13 @@ public class CommandBuilder {
         Class<?> paramType = parameter.getType();
         OptionType optionType = TYPE_MAP.get(parameter.getType());
 
-        Command.Choice[] choices = null;
+        net.dv8tion.jda.api.interactions.commands.Command.Choice[] choices = null;
 
         if (paramType.isEnum()) {
             Object[] enumConstants = paramType.getEnumConstants();
-            choices = new Command.Choice[enumConstants.length];
+            choices = new net.dv8tion.jda.api.interactions.commands.Command.Choice[enumConstants.length];
             for (int i = 0; i < enumConstants.length; i++)
-                choices[i] = new Command.Choice(enumConstants[i].toString(), i);
+                choices[i] = new net.dv8tion.jda.api.interactions.commands.Command.Choice(enumConstants[i].toString(), i);
             optionType = OptionType.INTEGER;
         } else if (MultipleChoiceOption.class.isAssignableFrom(paramType)) {
             try {
@@ -139,10 +139,10 @@ public class CommandBuilder {
      * @return Self
      */
     public CommandBuilder addMethod(@NotNull Module module, @NotNull Method method, @Nullable CommandGroup group) {
-        SlashCommand slashCommand = method.getAnnotation(SlashCommand.class);
+        Command command = method.getAnnotation(Command.class);
 
         // Method isn't a command
-        if (slashCommand == null)
+        if (command == null)
             return this;
 
         List<CustomOptionData> options = new ArrayList<>();
@@ -176,7 +176,7 @@ public class CommandBuilder {
 
         commandInfoList.add(
                 new CommandInfo(
-                        slashCommand,
+                        command,
                         module,
                         method,
                         group,

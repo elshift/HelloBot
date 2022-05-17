@@ -2,11 +2,10 @@ package org.elshift.modules.impl;
 
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.commands.Command;
 import org.elshift.Main;
-import org.elshift.commands.CommandContext;
+import org.elshift.commands.context.CommandContext;
 import org.elshift.commands.annotations.Option;
-import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.annotations.Command;
 import org.elshift.commands.options.MultipleChoiceOption;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
@@ -18,15 +17,16 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
     public HelpMenuModule() {
     }
 
-    @SlashCommand(name = "help", description = "Learn how to use HelloBot")
-    public void help(CommandContext context, @Option(name = "topic", required = false) ModuleNameOption moduleName) {
+    @Command(name = "help", description = "Learn how to use HelloBot")
+    public void help(CommandContext<?> context, @Option(name = "topic", required = false) ModuleNameOption moduleName) {
         String msg;
+
         if (moduleName == null)
             msg = formatActiveModules();
         else
             msg = formatRequestedModule(moduleName.get());
 
-        context.replyEphemeral(msg);
+        context.setEphemeral(true).reply(msg);
     }
 
     // Raw text-command, due to slash-command unavailability
@@ -108,11 +108,11 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
         }
 
         @Override
-        public @NotNull Command.Choice[] getChoices() {
+        public @NotNull net.dv8tion.jda.api.interactions.commands.Command.Choice[] getChoices() {
             return Main.getBot().getActiveModules().stream()
                     .map(Module::getName)
-                    .map(name -> new Command.Choice(name, name))
-                    .toArray(Command.Choice[]::new);
+                    .map(name -> new net.dv8tion.jda.api.interactions.commands.Command.Choice(name, name))
+                    .toArray(net.dv8tion.jda.api.interactions.commands.Command.Choice[]::new);
         }
     }
 }

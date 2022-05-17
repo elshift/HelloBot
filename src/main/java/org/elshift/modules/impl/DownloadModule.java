@@ -1,10 +1,11 @@
 package org.elshift.modules.impl;
 
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import org.elshift.commands.CommandContext;
+import org.elshift.commands.context.CommandContext;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.RunMode;
-import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.annotations.Command;
 import org.elshift.config.Config;
 import org.elshift.modules.Module;
 import org.elshift.util.TemporaryFileUploader;
@@ -147,18 +148,20 @@ public class DownloadModule extends ListenerAdapter implements Module {
         return file;
     }
 
-    @SlashCommand(name = "download", description = "Download a video from YouTube, Twitter, Instagram, TikTok, or Reddit")
+    @Command(name = "download", description = "Download a video from YouTube, Twitter, Instagram, TikTok, or Reddit")
     @RunMode(RunMode.Mode.Async)
-    public void downloadVideo(CommandContext context, @Option(name = "url", description = "post url") String url) {
+    public void downloadVideo(CommandContext<?> context, @Option(name = "url", description = "post url") String url) {
         if (!hasRequiredDependencies) {
-            context.replyEphemeral("Missing dependencies: ffmpeg + yt-dlp. Check log for more info.");
+            context.setEphemeral(true).reply(
+                    "Missing dependencies: ffmpeg + yt-dlp. Check log for more info.");
             return;
         }
 
         Matcher matcher = validUrlPatterns.matcher(url);
 
         if (!matcher.matches()) {
-            context.replyEphemeral("Invalid URL.\n\nSupported platforms:\nYouTube, Twitter, Instagram, TikTok and Reddit");
+            context.setEphemeral(true).reply(
+                    "Invalid URL.\n\nSupported platforms:\nYouTube, Twitter, Instagram, TikTok and Reddit");
             return;
         }
 
@@ -166,7 +169,7 @@ public class DownloadModule extends ListenerAdapter implements Module {
 
         logger.debug("Attempting to download: {}", url);
 
-        context.event().deferReply().queue();
+        context.deferReply();
 
         try {
             Path destination = Path.of(Config.get().downloadDir(), "%s.mp4".formatted(Instant.now().toEpochMilli()));
@@ -175,26 +178,25 @@ public class DownloadModule extends ListenerAdapter implements Module {
             long fileSize = downloadedFile.length();
             long maxFileSize = 1024 * 1024 * 8;
 
-            if (context.event().isFromGuild())
-                maxFileSize = Objects.requireNonNull(context.event().getGuild()).getMaxFileSize();
+            Guild guild = context.getGuild();
+            if (guild != null)
+                maxFileSize = guild.getMaxFileSize();
 
             // File is small enough to upload directly to Discord
             if (fileSize < maxFileSize) {
-                context.hook().sendFile(downloadedFile).queue();
+                context.sendFile(downloadedFile);
                 return;
             }
 
             String remoteUrl = TemporaryFileUploader.uploadAndGetURL(downloadedFile);
-            context.hook().sendMessage(remoteUrl).queue(m -> removalQueue.add(downloadedFile));
+            context.reply(remoteUrl);
         } catch (InterruptedException e) {
-            context.hook()
-                    .sendMessage("Your video took too long to download!")
-                    .setEphemeral(true).queue();
+            context.setEphemeral(true)
+                            .reply("Your video took too long to download!");
         } catch (Exception e) {
             logger.warn("Failed to download video", e);
-            context.hook()
-                    .sendMessage("Failed to download video (image only posts aren't supported on all platforms).")
-                    .setEphemeral(true).queue();
+            context.setEphemeral(true)
+                            .reply("Failed to download video (image only posts aren't supported on all platforms).");
         }
     }
 

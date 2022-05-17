@@ -5,6 +5,7 @@ import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.AutoCompleteQuery;
@@ -14,6 +15,9 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import org.elshift.commands.annotations.RunMode;
+import org.elshift.commands.context.impl.SlashCommandContext;
+import org.elshift.commands.context.impl.TextCommandContext;
+import org.elshift.config.Config;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,28 +87,6 @@ public class CommandHandler extends ListenerAdapter {
         }
     }
 
-    /**
-     * Attempt to execute a command.
-     */
-    private void handleCommand(SlashCommandInteractionEvent event, @NotNull CommandInfo commandInfo) {
-        CommandContext context = new CommandContext(event);
-        List<OptionMapping> args = commandInfo.getOptions().stream().map(option -> event.getOption(option.getName())).collect(Collectors.toList());
-
-        Runnable invoke = () -> {
-            try {
-                commandInfo.invoke(context, args);
-            } catch (Exception e) {
-                logger.error("Failed to execute command {}", commandInfo.getCommand().name(), e);
-                event.reply("Failed to execute command!").setEphemeral(true).queue();
-            }
-        };
-
-        if (commandInfo.getRunMode() == RunMode.Mode.Async)
-            asynchronousExecutor.execute(invoke);
-        else
-            synchronousExecutor.execute(invoke);
-    }
-
     private CommandInfo getCommandForEvent(CommandInteractionPayload event) {
         List<CommandInfo> list = commands.stream().filter(info -> info.matchesEvent(event)).toList();
         if (list.isEmpty())
@@ -128,6 +110,46 @@ public class CommandHandler extends ListenerAdapter {
     }
 
     @Override
+    public void onMessageReceived(@NotNull MessageReceivedEvent event) {
+        String content = event.getMessage().getContentRaw();
+
+        boolean prefixFound = false;
+        String prefix = null;
+        for (String currentPrefix : Config.get().prefixes()) {
+            prefixFound = content.startsWith(currentPrefix);
+            if(prefixFound) {
+                prefix = currentPrefix;
+                break;
+            }
+        }
+
+        if(!prefixFound)
+            return;
+
+        content = content.substring(prefix.length()).trim();
+        if(content.isEmpty())
+            return;
+
+        String[] words = content.split("\\s+");
+        if(words.length == 0)
+            return;
+
+        String commandName = words[0];
+
+        Optional<CommandInfo> infoOptional = commands.stream()
+                .filter(command -> command.getCommand().name().equalsIgnoreCase(commandName))
+                .findFirst();
+
+        if(infoOptional.isEmpty())
+            return;
+
+        CommandInfo info = infoOptional.get();
+
+        TextCommandContext context = new TextCommandContext(event);
+        info.invoke(context, words);
+    }
+
+    @Override
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
         CommandInfo info = getCommandForEvent(event);
 
@@ -136,7 +158,24 @@ public class CommandHandler extends ListenerAdapter {
             return;
         }
 
-        handleCommand(event, info);
+        SlashCommandContext context = new SlashCommandContext(event);
+        List<OptionMapping> args = info.getOptions().stream()
+                .map(option -> event.getOption(option.getName()))
+                .collect(Collectors.toList());
+
+        Runnable invoke = () -> {
+            try {
+                info.invoke(context, args);
+            } catch (Exception e) {
+                logger.error("Failed to execute command {}", info.getCommand().name(), e);
+                event.reply("Failed to execute command!").setEphemeral(true).queue();
+            }
+        };
+
+        if (info.getRunMode() == RunMode.Mode.Async)
+            asynchronousExecutor.execute(invoke);
+        else
+            synchronousExecutor.execute(invoke);
     }
 
     @Override

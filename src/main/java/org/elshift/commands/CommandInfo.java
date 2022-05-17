@@ -2,11 +2,16 @@ package org.elshift.commands;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Channel;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+import org.elshift.commands.annotations.Command;
 import org.elshift.commands.annotations.CommandGroup;
 import org.elshift.commands.annotations.RunMode;
-import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.context.impl.SlashCommandContext;
+import org.elshift.commands.context.impl.TextCommandContext;
 import org.elshift.commands.options.MultipleChoiceOption;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +27,7 @@ import java.util.List;
 public final class CommandInfo {
     private static final List<CustomOptionData> EMPTY_OPTIONS_LIST = new ArrayList<>();
 
-    private final @NotNull SlashCommand command;
+    private final @NotNull Command command;
     private final Module module;
     private final @NotNull Method method;
     private final CommandGroup group;
@@ -31,7 +36,7 @@ public final class CommandInfo {
     private final Class<?>[] parameterTypes;
 
     public CommandInfo(
-            @NotNull SlashCommand command,
+            @NotNull Command command,
             @NotNull Module module,
             @NotNull Method method,
             @Nullable CommandGroup group,
@@ -88,19 +93,40 @@ public final class CommandInfo {
         };
     }
 
+    private Object getArgumentValue(Class<?> type, JDA jda, String argument) {
+        if(String.class.equals(type))
+            return argument;
+        else if(Integer.class.equals(type))
+            return Integer.parseInt(argument);
+        else if(Float.class.equals(type))
+            return Float.parseFloat(argument);
+        else if(Double.class.equals(type))
+            return Double.parseDouble(argument);
+        else if(Boolean.class.equals(type))
+            return Boolean.parseBoolean(argument);
+        else if(User.class.equals(type))
+            return jda.getUserById(argument);
+        else if(Channel.class.equals(type))
+            return jda.getChannelById(Channel.class, argument);
+        else if(Role.class.equals(type))
+            return jda.getRoleById(argument);
+        else if(Member.class.equals(type))
+            return jda.getRoleById(argument);
+        throw new UnsupportedOperationException("unsupported parameter type: " + type.getName());
+    }
+
     /**
      * Invokes the command with the specified command context & arguments.
      *
      * @param ctx  The context in which the command was executed
      * @param args The arguments
      */
-    public void invoke(@NotNull CommandContext ctx, @NotNull List<OptionMapping> args) throws ReflectiveOperationException {
-        // TODO: 5/13/2022 invalid parameter types will throw ReflectiveOperationException, check the types before
-        // TODO: 5/13/2022 invocation to provide a better error message
+    public void invoke(@NotNull SlashCommandContext ctx,
+                       @NotNull List<OptionMapping> args) throws ReflectiveOperationException {
         Object[] arguments = new Object[1 + args.size()];
         arguments[0] = ctx; // ctx is always first
 
-        JDA jda = ctx.event().getJDA();
+        JDA jda = ctx.getJDA();
         for (int i = 0; i < args.size(); i++) {
             Object rawValue = getOptionValue(jda, args.get(i));
             // Add 1 to skip over ctx
@@ -118,6 +144,17 @@ public final class CommandInfo {
         method.invoke(module, arguments);
     }
 
+    public void invoke(TextCommandContext ctx, String[] args) {
+        Object[] arguments = new Object[parameterTypes.length];
+        arguments[0] = ctx;
+
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+
+            // TODO: 5/17/2022 parse arguments and invoke command method
+        }
+    }
+
     /**
      * @return The module that holds this command
      */
@@ -128,7 +165,7 @@ public final class CommandInfo {
     /**
      * @return The actual slash command
      */
-    public @NotNull SlashCommand getCommand() {
+    public @NotNull Command getCommand() {
         return command;
     }
 

@@ -17,7 +17,8 @@ public class Config implements Serializable {
     private String token;
     private String activity;
     private String downloadDir;
-    private HashSet<String> whitelist;
+    private HashSet<String> whitelist = new HashSet<>();
+    private HashSet<String> prefixes = new HashSet<>();
 
     private static void saveDefault(String path) {
         Config config = new Config();
@@ -25,6 +26,10 @@ public class Config implements Serializable {
         config.downloadDir = "downloads/";
         config.activity = "";
         config.whitelist = new HashSet<>();
+        config.prefixes = new HashSet<>() {{
+            add("/");
+            add("$");
+        }};
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try (FileWriter writer = new FileWriter(path)) {
@@ -46,6 +51,10 @@ public class Config implements Serializable {
             System.exit(0);
         }
 
+        if(result.prefixes == null || result.prefixes.isEmpty()) {
+            logger.warn("You have not configured any text command prefixes! Text commands will not work.");
+        }
+
         return result;
     }
 
@@ -65,7 +74,11 @@ public class Config implements Serializable {
         return activity;
     }
 
-    public HashSet<String> getWhitelist() {
+    public HashSet<String> whitelist() {
         return whitelist;
+    }
+
+    public HashSet<String> prefixes() {
+        return prefixes;
     }
 }

@@ -4,9 +4,9 @@ import com.google.gson.Gson;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import org.elshift.commands.CommandContext;
+import org.elshift.commands.context.CommandContext;
 import org.elshift.commands.annotations.Option;
-import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.annotations.Command;
 import org.elshift.modules.Module;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -34,20 +34,20 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
         return true;
     }
 
-    @SlashCommand(name = "sakuga", description = "Search Sakugabooru")
-    public void searchSakuga(CommandContext context, @Option(name = "tags", required = false) String rawTags) {
+    @Command(name = "sakuga", description = "Search Sakugabooru")
+    public void searchSakuga(CommandContext<?> context, @Option(name = "tags", required = false) String rawTags) {
         Set<String> tags = createSimplifiedTags(rawTags);
         try {
             SakugabooruPost[] posts = fetchPosts(tags);
             if (posts.length <= 0) {
-                context.replyEphemeral(formatEmptySearchResults(tags));
+                context.setEphemeral(true).reply(formatEmptySearchResults(tags));
                 return;
             }
 
-            context.event().reply(formatSearchedPost(posts[0], tags)).queue();
+            context.reply(formatSearchedPost(posts[0], tags));
         } catch (Exception e) {
             logger.error("Failed to search %s".formatted(MOEBOORU_API), e);
-            context.replyEphemeral("Failed to search: " + e.getMessage());
+            context.setEphemeral(true).reply("Failed to search: " + e.getMessage());
         }
     }
 
