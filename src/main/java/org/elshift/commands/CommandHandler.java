@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -181,8 +182,8 @@ public class CommandHandler extends ListenerAdapter {
 
     @Override
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
-        String textPrefix = Config.get().getTextPrefix();
-        if (textPrefix == null || textPrefix.isEmpty())
+        Collection<String> prefixes = Config.get().textPrefixes();
+        if (prefixes == null || prefixes.isEmpty())
             return;
 
         ParsedTextCommand parsed = new ParsedTextCommand(event.getMessage().getContentRaw());

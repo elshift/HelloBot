@@ -2,6 +2,8 @@ package org.elshift.util;
 
 import org.elshift.config.Config;
 
+import java.util.Collection;
+
 public class ParsedTextCommand {
     private final String rawText;
     private final boolean hasPrefix;
@@ -9,12 +11,22 @@ public class ParsedTextCommand {
     private String cmdArgs = null;
 
     public ParsedTextCommand(String text) {
-        String textPrefix = Config.get().getTextPrefix();
+        Collection<String> textPrefixes = Config.get().textPrefixes();
 
         rawText = text;
-        hasPrefix = textPrefix != null && text.startsWith(textPrefix);
+        String foundPrefix = null;
+        if (textPrefixes != null && !textPrefixes.isEmpty()) {
+            for (String prefix : textPrefixes) {
+                if (text.startsWith(prefix)) {
+                    foundPrefix = prefix;
+                    break;
+                }
+            }
+        }
 
-        int cmdNameStart = getTrimmedPos(text, hasPrefix ? textPrefix.length() : 0);
+        hasPrefix = foundPrefix != null;
+
+        int cmdNameStart = getTrimmedPos(text, hasPrefix ? foundPrefix.length() : 0);
         if (cmdNameStart < 0)
             return;
 
@@ -27,10 +39,21 @@ public class ParsedTextCommand {
             cmdArgs = text.substring(cmdArgsStart, getTrimmedEndPos(text));
     }
 
-    public boolean hasPrefix() { return hasPrefix; }
-    public String getRawText() { return rawText; }
-    public String getCmdName() { return cmdName; }
-    public String getCmdArgs() { return cmdArgs; }
+    public boolean hasPrefix() {
+        return hasPrefix;
+    }
+
+    public String getRawText() {
+        return rawText;
+    }
+
+    public String getCmdName() {
+        return cmdName;
+    }
+
+    public String getCmdArgs() {
+        return cmdArgs;
+    }
 
     private static int getTrimmedPos(String text, int pos) {
         for (; pos < text.length(); ++pos) {
@@ -50,7 +73,7 @@ public class ParsedTextCommand {
 
     private static int getTrimmedEndPos(String text) {
         int i = text.length();
-        while(i >= 1 && Character.isWhitespace(text.charAt(i - 1)))
+        while (i >= 1 && Character.isWhitespace(text.charAt(i - 1)))
             --i;
         return i;
     }

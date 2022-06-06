@@ -50,7 +50,7 @@ public class HelloBot extends ListenerAdapter {
                 .getTopLevelClassesRecursive("org.elshift.modules")
                 .stream().toList();
 
-        Set<String> whitelist = Config.get().getWhitelist();
+        Set<String> whitelist = Config.get().whitelist();
         boolean hasWhitelist = whitelist != null && !whitelist.isEmpty();
 
         for (ClassPath.ClassInfo classInfo : moduleClasses) {
