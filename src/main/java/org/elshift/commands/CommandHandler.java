@@ -1,10 +1,12 @@
 package org.elshift.commands;
 
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.events.Event;
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
 import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.AutoCompleteQuery;
@@ -14,6 +16,8 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import org.elshift.commands.annotations.RunMode;
+import org.elshift.config.Config;
+import org.elshift.util.ParsedTextCommand;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,29 +34,30 @@ import java.util.stream.Collectors;
  */
 public class CommandHandler extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(CommandHandler.class);
-    private final List<CommandInfo> commands;
+    private final List<CommandMethod> commands;
 
     private final List<SlashCommandData> slashCommands = new ArrayList<>();
     private final ExecutorService synchronousExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService asynchronousExecutor = Executors.newCachedThreadPool();
 
-    public CommandHandler(List<CommandInfo> commands) {
+    public CommandHandler(List<CommandMethod> commands) {
         this.commands = commands;
     }
 
     private void registerCommandsForGuild(Guild guild) {
         if (slashCommands.isEmpty()) {
-            for (CommandInfo commandInfo : commands) {
+            for (CommandMethod baseCmd : commands) {
+                if (!(baseCmd instanceof SlashCommandMethod slashMethod))
+                    continue;
+
                 SlashCommandData command = Commands.slash(
-                        commandInfo.getCommand().name(),
-                        commandInfo.getCommand().description()
+                        slashMethod.getCommand().name(),
+                        slashMethod.getCommand().description()
                 );
 
-                boolean hasOptions = commandInfo.getOptions() != null && !commandInfo.getOptions().isEmpty();
-
-
+                boolean hasOptions = slashMethod.getOptions() != null && !slashMethod.getOptions().isEmpty();
                 if (hasOptions)
-                    command.addOptions(commandInfo.getOptions());
+                    command.addOptions(slashMethod.getOptions());
 
                 slashCommands.add(command);
             }
@@ -86,34 +91,36 @@ public class CommandHandler extends ListenerAdapter {
     /**
      * Attempt to execute a command.
      */
-    private void handleCommand(SlashCommandInteractionEvent event, @NotNull CommandInfo commandInfo) {
-        CommandContext context = new CommandContext(event);
-        List<OptionMapping> args = commandInfo.getOptions().stream().map(option -> event.getOption(option.getName())).collect(Collectors.toList());
-
+    private void handleCommand(Event event, @NotNull CommandMethod cmdMethod) {
         Runnable invoke = () -> {
             try {
-                commandInfo.invoke(context, args);
+                cmdMethod.invoke(event);
             } catch (Exception e) {
-                logger.error("Failed to execute command {}", commandInfo.getCommand().name(), e);
-                event.reply("Failed to execute command!").setEphemeral(true).queue();
+                logger.error("Failed to execute command {}", cmdMethod.getName(), e);
+                String response = "Failed to execute command!";
+
+                if (event instanceof SlashCommandInteractionEvent slashEvent)
+                    slashEvent.reply(response).setEphemeral(true).queue();
+                else if (event instanceof MessageReceivedEvent msgEvent)
+                    msgEvent.getMessage().reply(response).queue();
             }
         };
 
-        if (commandInfo.getRunMode() == RunMode.Mode.Async)
+        if (cmdMethod.getRunMode() == RunMode.Mode.Async)
             asynchronousExecutor.execute(invoke);
         else
             synchronousExecutor.execute(invoke);
     }
 
-    private CommandInfo getCommandForEvent(CommandInteractionPayload event) {
-        List<CommandInfo> list = commands.stream().filter(info -> info.matchesEvent(event)).toList();
+    private CommandMethod getCommandForEvent(Object event) {
+        List<CommandMethod> list = commands.stream().filter(info -> info.matchesEvent(event)).toList();
         if (list.isEmpty())
             return null;
 
         return list.get(0);
     }
 
-    public List<CommandInfo> getCommands() {
+    public List<CommandMethod> getCommands() {
         return commands;
     }
 
@@ -129,24 +136,22 @@ public class CommandHandler extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
-        CommandInfo info = getCommandForEvent(event);
+        CommandMethod info = getCommandForEvent(event);
 
-        if (info == null) {
+        if (info == null)
             event.reply("Command does not exist.").setEphemeral(true).queue();
-            return;
-        }
-
-        handleCommand(event, info);
+        else
+            handleCommand(event, info);
     }
 
     @Override
     public void onCommandAutoCompleteInteraction(@NotNull CommandAutoCompleteInteractionEvent event) {
-        CommandInfo info = getCommandForEvent(event);
+        CommandMethod method = getCommandForEvent(event);
 
-        if (info == null)
+        if (!(method instanceof SlashCommandMethod slashMethod))
             return;
 
-        List<CustomOptionData> options = info.getOptions();
+        List<CustomOptionData> options = slashMethod.getOptions();
         if (options.isEmpty())
             return;
 
@@ -172,5 +177,20 @@ public class CommandHandler extends ListenerAdapter {
             return;
 
         event.replyChoices(candidates).queue();
+    }
+
+    @Override
+    public void onMessageReceived(@NotNull MessageReceivedEvent event) {
+        String textPrefix = Config.get().getTextPrefix();
+        if (textPrefix == null || textPrefix.isEmpty())
+            return;
+
+        ParsedTextCommand parsed = new ParsedTextCommand(event.getMessage().getContentRaw());
+        if (!parsed.hasPrefix())
+            return;
+
+        CommandMethod cmd = getCommandForEvent(event);
+        if (cmd != null)
+            handleCommand(event, cmd);
     }
 }

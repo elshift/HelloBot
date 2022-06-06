@@ -1,13 +1,15 @@
 package org.elshift.modules.impl.sakugabooru;
 
 import com.google.gson.Gson;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import org.elshift.commands.CommandContext;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.annotations.TextCommand;
 import org.elshift.modules.Module;
+import org.elshift.util.ParsedTextCommand;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,43 +37,25 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
     }
 
     @SlashCommand(name = "sakuga", description = "Search Sakugabooru")
-    public void searchSakuga(CommandContext context, @Option(name = "tags", required = false) String rawTags) {
+    public void slashSearchSakuga(SlashCommandInteractionEvent event, @Option(name = "tags", required = false) String rawTags) {
         Set<String> tags = createSimplifiedTags(rawTags);
         try {
             SakugabooruPost[] posts = fetchPosts(tags);
             if (posts.length <= 0) {
-                context.replyEphemeral(formatEmptySearchResults(tags));
+                event.reply(formatEmptySearchResults(tags)).setEphemeral(true).queue();
                 return;
             }
 
-            context.event().reply(formatSearchedPost(posts[0], tags)).queue();
+            event.reply(formatSearchedPost(posts[0], tags)).queue();
         } catch (Exception e) {
             logger.error("Failed to search %s".formatted(MOEBOORU_API), e);
-            context.replyEphemeral("Failed to search: " + e.getMessage());
+            event.reply("Failed to search: " + e.getMessage()).setEphemeral(true).queue();
         }
     }
 
-    // Raw text-command, due to slash-command unavailability
-    // (Works in DMs and for clients that don't update when the bot first joins)
-    @Override
-    public void onMessageReceived(@NotNull MessageReceivedEvent event) {
-        String contents = event.getMessage().getContentDisplay();
-
-        final String[] prefixes = {"$sakuga tags:", "$sakuga", "$s tags:", "$s", "/sakuga tags:", "/sakuga"};
-        String foundPrefix = null;
-        for (String prefix : prefixes) {
-            if (contents.startsWith(prefix)) {
-                foundPrefix = prefix;
-                break;
-            }
-        }
-
-        if (foundPrefix != null)
-            contents = contents.substring(foundPrefix.length()).trim();
-        else
-            return;
-
-        Set<String> tags = createSimplifiedTags(contents);
+    @TextCommand(name = "sakuga", description = "Search Sakugabooru", aliases = {"s"})
+    public void textSearchSakuga(@NotNull MessageReceivedEvent event, ParsedTextCommand parsedText) {
+        Set<String> tags = createSimplifiedTags(parsedText.getCmdArgs());
         try {
             SakugabooruPost[] posts = fetchPosts(tags);
             String msg = (posts.length > 0) ? formatSearchedPost(posts[0], tags) : formatEmptySearchResults(tags);

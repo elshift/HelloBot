@@ -17,6 +17,7 @@ public class Config implements Serializable {
     private String token;
     private String activity;
     private String downloadDir;
+    private String textPrefix;
     private HashSet<String> whitelist;
 
     private static void saveDefault(String path) {
@@ -24,6 +25,7 @@ public class Config implements Serializable {
         config.token = "YOUR_TOKEN";
         config.downloadDir = "downloads/";
         config.activity = "";
+        config.textPrefix = "";
         config.whitelist = new HashSet<>();
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -64,6 +66,8 @@ public class Config implements Serializable {
     public String activity() {
         return activity;
     }
+
+    public String getTextPrefix() { return textPrefix; }
 
     public HashSet<String> getWhitelist() {
         return whitelist;

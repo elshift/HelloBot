@@ -1,10 +1,10 @@
 package org.elshift.modules.impl;
 
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import org.elshift.Main;
-import org.elshift.commands.CommandContext;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.SlashCommand;
 import org.elshift.commands.options.MultipleChoiceOption;
@@ -19,14 +19,14 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
     }
 
     @SlashCommand(name = "help", description = "Learn how to use HelloBot")
-    public void help(CommandContext context, @Option(name = "topic", required = false) ModuleNameOption moduleName) {
+    public void help(SlashCommandInteractionEvent event, @Option(name = "topic", required = false) ModuleNameOption moduleName) {
         String msg;
         if (moduleName == null)
             msg = formatActiveModules();
         else
             msg = formatRequestedModule(moduleName.get());
 
-        context.replyEphemeral(msg);
+        event.reply(msg).setEphemeral(true).queue();
     }
 
     // Raw text-command, due to slash-command unavailability

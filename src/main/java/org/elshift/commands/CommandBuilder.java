@@ -1,6 +1,8 @@
 package org.elshift.commands;
 
 import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
@@ -9,6 +11,7 @@ import org.elshift.commands.annotations.choice.*;
 import org.elshift.commands.autocomplete.AutoCompleteProvider;
 import org.elshift.commands.options.MultipleChoiceOption;
 import org.elshift.modules.Module;
+import org.elshift.util.ParsedTextCommand;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,10 +22,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.security.InvalidParameterException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Helper class to make adding slash commands easier.
@@ -30,8 +30,6 @@ import java.util.Map;
 @SuppressWarnings("UnusedReturnValue")
 public class CommandBuilder {
     private static final Logger logger = LoggerFactory.getLogger(CommandBuilder.class);
-    private final List<CommandInfo> commandInfoList = new ArrayList<>();
-
     private static final Map<Class<?>, OptionType> TYPE_MAP = new HashMap<>() {{
         put(String.class, OptionType.STRING);
         put(Integer.class, OptionType.INTEGER);
@@ -45,6 +43,7 @@ public class CommandBuilder {
         put(Role.class, OptionType.ROLE);
         put(Message.Attachment.class, OptionType.ATTACHMENT);
     }};
+    private final List<CommandMethod> commandInfoList = new ArrayList<>();
 
     private void populateOptionChoices(OptionData optionData, Parameter parameter) {
         StringChoices stringChoices = parameter.getAnnotation(StringChoices.class);
@@ -132,19 +131,51 @@ public class CommandBuilder {
     }
 
     /**
-     * Adds a slash command method.
+     * Adds a command method.
      *
      * @param method The method to add
      * @param group  Optional group
      * @return Self
      */
     public CommandBuilder addMethod(@NotNull Module module, @NotNull Method method, @Nullable CommandGroup group) {
-        SlashCommand slashCommand = method.getAnnotation(SlashCommand.class);
+        SlashCommand slashCmd = method.getAnnotation(SlashCommand.class);
+        TextCommand textCmd = method.getAnnotation(TextCommand.class);
 
-        // Method isn't a command
-        if (slashCommand == null)
-            return this;
+        if (slashCmd != null)
+            addSlashMethod(slashCmd, module, method, group);
+        else if (textCmd != null)
+            addTextMethod(textCmd, module, method, group);
 
+        return this;
+    }
+
+    protected void addTextMethod(
+            @NotNull TextCommand textCommand,
+            @NotNull Module module,
+            @NotNull Method method,
+            @Nullable CommandGroup group
+    ) {
+        final Object[] paramPattern = { MessageReceivedEvent.class, ParsedTextCommand.class };
+
+        if (!Arrays.equals(method.getParameterTypes(), paramPattern)) {
+            throw new InvalidParameterException(
+                    "Must have the following parameters: %s"
+                            .formatted(Arrays.toString(paramPattern)));
+        }
+
+        RunMode runMode = method.getAnnotation(RunMode.class);
+        commandInfoList.add(
+                new TextCommandMethod(textCommand, module, method, group, runMode)
+        );
+    }
+
+
+    protected void addSlashMethod(
+            @NotNull SlashCommand slashCommand,
+            @NotNull Module module,
+            @NotNull Method method,
+            @Nullable CommandGroup group
+    ) {
         List<CustomOptionData> options = new ArrayList<>();
 
         boolean doesHaveCommandContext = false;
@@ -157,11 +188,14 @@ public class CommandBuilder {
             if (parameter.getType().isPrimitive())
                 throw new InvalidParameterException("Parameter cannot be a primitive type");
 
-            boolean isCommandContext = CommandContext.class.equals(parameter.getType());
+            boolean isCommandContext = SlashCommandInteractionEvent.class.equals(parameter.getType());
 
-            if (i == 0 && !isCommandContext)
-                throw new InvalidParameterException("First parameter must be %s".formatted(CommandContext.class.getName()));
-            else if (isCommandContext) {
+            if (i == 0 && !isCommandContext) {
+                throw new InvalidParameterException(
+                        "First parameter must be %s"
+                                .formatted(SlashCommandInteractionEvent.class.getName())
+                );
+            } else if (isCommandContext) {
                 doesHaveCommandContext = true;
                 continue;
             }
@@ -169,22 +203,20 @@ public class CommandBuilder {
             options.add(getParameterOptionData(module, parameter));
         }
 
-        if (!doesHaveCommandContext)
-            throw new InvalidParameterException("Method provided must have %s as first parameter".formatted(CommandContext.class.getName()));
+        if (!doesHaveCommandContext) {
+            throw new InvalidParameterException(
+                    "Method provided must have %s as first parameter"
+                            .formatted(SlashCommandInteractionEvent.class.getName())
+            );
+        }
 
         RunMode runMode = method.getAnnotation(RunMode.class);
 
         commandInfoList.add(
-                new CommandInfo(
-                        slashCommand,
-                        module,
-                        method,
-                        group,
-                        options,
-                        runMode
+                new SlashCommandMethod(
+                        slashCommand, module, method, group, options, runMode
                 )
         );
-        return this;
     }
 
     /**
@@ -205,7 +237,7 @@ public class CommandBuilder {
     /**
      * @return The command info list.
      */
-    public List<CommandInfo> build() {
+    public List<CommandMethod> build() {
         return commandInfoList;
     }
 }

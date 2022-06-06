@@ -2,6 +2,8 @@ package org.elshift.commands;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Channel;
+import net.dv8tion.jda.api.events.Event;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import org.elshift.commands.annotations.CommandGroup;
@@ -15,22 +17,17 @@ import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
-/**
- * Stores information about a command.
- */
-public final class CommandInfo {
+public final class SlashCommandMethod extends CommandMethod {
     private static final List<CustomOptionData> EMPTY_OPTIONS_LIST = new ArrayList<>();
 
     private final @NotNull SlashCommand command;
-    private final Module module;
-    private final @NotNull Method method;
     private final CommandGroup group;
     private final List<CustomOptionData> options;
-    private final RunMode.Mode runMode;
     private final Class<?>[] parameterTypes;
 
-    public CommandInfo(
+    public SlashCommandMethod(
             @NotNull SlashCommand command,
             @NotNull Module module,
             @NotNull Method method,
@@ -38,12 +35,10 @@ public final class CommandInfo {
             @NotNull List<CustomOptionData> options,
             @Nullable RunMode runMode
     ) {
+        super(command.name(), module, method, group, runMode);
         this.command = command;
-        this.module = module;
-        this.method = method;
         this.group = group;
         this.options = options;
-        this.runMode = runMode == null ? RunMode.Mode.Sync : runMode.value();
         this.parameterTypes = method.getParameterTypes();
     }
 
@@ -57,16 +52,20 @@ public final class CommandInfo {
     /**
      * @return Whether the interaction event matches this command
      */
-    public boolean matchesEvent(@NotNull CommandInteractionPayload event) {
-        if (event.getSubcommandGroup() == null && getGroup() != null)
-            return false;
-        if (event.getSubcommandGroup() != null && getGroup() == null)
-            return false;
-
-        if (getGroup() != null && !isSubcommandOf(event.getSubcommandGroup()))
+    @Override
+    public boolean matchesEvent(@NotNull Object event) {
+        if (!(event instanceof CommandInteractionPayload interaction))
             return false;
 
-        return command.name().equals(event.getName());
+        if (interaction.getSubcommandGroup() == null && getGroup() != null)
+            return false;
+        if (interaction.getSubcommandGroup() != null && getGroup() == null)
+            return false;
+
+        if (getGroup() != null && !isSubcommandOf(interaction.getSubcommandGroup()))
+            return false;
+
+        return command.name().equals(interaction.getName());
     }
 
     // I wish JDA let you grab the raw object...
@@ -88,19 +87,19 @@ public final class CommandInfo {
         };
     }
 
-    /**
-     * Invokes the command with the specified command context & arguments.
-     *
-     * @param ctx  The context in which the command was executed
-     * @param args The arguments
-     */
-    public void invoke(@NotNull CommandContext ctx, @NotNull List<OptionMapping> args) throws ReflectiveOperationException {
+    public void invoke(@NotNull Event ctx) throws ReflectiveOperationException {
         // TODO: 5/13/2022 invalid parameter types will throw ReflectiveOperationException, check the types before
         // TODO: 5/13/2022 invocation to provide a better error message
-        Object[] arguments = new Object[1 + args.size()];
-        arguments[0] = ctx; // ctx is always first
 
-        JDA jda = ctx.event().getJDA();
+        if (!(ctx instanceof SlashCommandInteractionEvent slashEvent))
+            throw new IllegalArgumentException("Expected SlashCommandInteractionEvent");
+
+        List<OptionMapping> args = getOptions().stream().map(option -> slashEvent.getOption(option.getName())).collect(Collectors.toList());
+
+        Object[] arguments = new Object[1 + args.size()];
+        arguments[0] = slashEvent; // ctx is always first
+
+        JDA jda = slashEvent.getJDA();
         for (int i = 0; i < args.size(); i++) {
             Object rawValue = getOptionValue(jda, args.get(i));
             // Add 1 to skip over ctx
@@ -115,14 +114,7 @@ public final class CommandInfo {
                 arguments[i + 1] = rawValue;
         }
 
-        method.invoke(module, arguments);
-    }
-
-    /**
-     * @return The module that holds this command
-     */
-    public Module getModule() {
-        return module;
+        getMethod().invoke(getModule(), arguments);
     }
 
     /**
@@ -145,12 +137,5 @@ public final class CommandInfo {
      */
     public List<CustomOptionData> getOptions() {
         return options == null ? EMPTY_OPTIONS_LIST : options;
-    }
-
-    /**
-     * @return The mode of execution for this command
-     */
-    public RunMode.Mode getRunMode() {
-        return runMode;
     }
 }

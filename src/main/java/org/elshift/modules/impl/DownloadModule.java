@@ -1,7 +1,7 @@
 package org.elshift.modules.impl;
 
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import org.elshift.commands.CommandContext;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.RunMode;
 import org.elshift.commands.annotations.SlashCommand;
@@ -149,16 +149,18 @@ public class DownloadModule extends ListenerAdapter implements Module {
 
     @SlashCommand(name = "download", description = "Download a video from YouTube, Twitter, Instagram, TikTok, or Reddit")
     @RunMode(RunMode.Mode.Async)
-    public void downloadVideo(CommandContext context, @Option(name = "url", description = "post url") String url) {
+    public void downloadVideo(SlashCommandInteractionEvent event, @Option(name = "url", description = "post url") String url) {
         if (!hasRequiredDependencies) {
-            context.replyEphemeral("Missing dependencies: ffmpeg + yt-dlp. Check log for more info.");
+            event.reply("Missing dependencies: ffmpeg + yt-dlp. Check log for more info.")
+                    .setEphemeral(true).queue();
             return;
         }
 
         Matcher matcher = validUrlPatterns.matcher(url);
 
         if (!matcher.matches()) {
-            context.replyEphemeral("Invalid URL.\n\nSupported platforms:\nYouTube, Twitter, Instagram, TikTok and Reddit");
+            event.reply("Invalid URL.\n\nSupported platforms:\nYouTube, Twitter, Instagram, TikTok and Reddit")
+                    .setEphemeral(true).queue();
             return;
         }
 
@@ -166,7 +168,7 @@ public class DownloadModule extends ListenerAdapter implements Module {
 
         logger.debug("Attempting to download: {}", url);
 
-        context.event().deferReply().queue();
+        event.deferReply().queue();
 
         try {
             Path destination = Path.of(Config.get().downloadDir(), "%s.mp4".formatted(Instant.now().toEpochMilli()));
@@ -175,24 +177,24 @@ public class DownloadModule extends ListenerAdapter implements Module {
             long fileSize = downloadedFile.length();
             long maxFileSize = 1024 * 1024 * 8;
 
-            if (context.event().isFromGuild())
-                maxFileSize = Objects.requireNonNull(context.event().getGuild()).getMaxFileSize();
+            if (event.isFromGuild())
+                maxFileSize = Objects.requireNonNull(event.getGuild()).getMaxFileSize();
 
             // File is small enough to upload directly to Discord
             if (fileSize < maxFileSize) {
-                context.hook().sendFile(downloadedFile).queue();
+                event.getHook().sendFile(downloadedFile).queue();
                 return;
             }
 
             String remoteUrl = TemporaryFileUploader.uploadAndGetURL(downloadedFile);
-            context.hook().sendMessage(remoteUrl).queue(m -> removalQueue.add(downloadedFile));
+            event.getHook().sendMessage(remoteUrl).queue(m -> removalQueue.add(downloadedFile));
         } catch (InterruptedException e) {
-            context.hook()
+            event.getHook()
                     .sendMessage("Your video took too long to download!")
                     .setEphemeral(true).queue();
         } catch (Exception e) {
             logger.warn("Failed to download video", e);
-            context.hook()
+            event.getHook()
                     .sendMessage("Failed to download video (image only posts aren't supported on all platforms).")
                     .setEphemeral(true).queue();
         }

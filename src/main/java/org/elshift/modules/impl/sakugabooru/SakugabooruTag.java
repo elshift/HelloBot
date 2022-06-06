@@ -5,14 +5,29 @@ import com.google.gson.annotations.SerializedName;
 
 public class SakugabooruTag {
     public enum Order {
-        DATE("date"),
-        COUNT("count"),
-        TIME("time");
+        DATE,
+        COUNT,
+        TIME;
 
         public final String urlValue;
 
-        Order(String value) {
-            this.urlValue = value;
+        Order() {
+            this.urlValue = this.name().toLowerCase();
+        }
+    }
+
+    public enum Type {
+        GENERAL(0),
+        ARTIST(1),
+        COPYRIGHT(3),
+        CHARACTER(4);
+
+        public final int intValue;
+        public final String urlValue;
+
+        Type(int value) {
+            this.intValue = value;
+            this.urlValue = this.name().toLowerCase();
         }
     }
 
