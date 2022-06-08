@@ -6,7 +6,6 @@ import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.SlashCommand;
 import org.elshift.commands.annotations.TextCommand;
@@ -30,7 +29,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class SakugabooruModule extends ListenerAdapter implements Module {
+public class SakugabooruModule implements Module {
     // Can be any server running Moebooru (and probably works for most Danbooru instances too)
     private static final String MOEBOORU_API = "https://sakugabooru.com";
     private static final int DB_UPDATE_BATCH_SIZE = 500;
@@ -101,6 +100,8 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
         String tags = formatTags(allTags);
         String artists = formatArtists(allTags);
         String postFile = post.getFileUrl();
+        if (post.getRating().equalsIgnoreCase("e"))
+            postFile = ":warning: **EXPLICIT**: || " + post.getFileUrl() + " ||";
 
         return joinNonEmptyStrings("\n", search, postUrl, tags, artists, postFile);
     }
@@ -351,7 +352,7 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
                 - Posts of Boruto episode #217: `/sakuga boruto:_naruto_next_generations source:#217`
                                 
                 :speech_left: **Did you know...**
-                You can also use `$s` or `$sakuga` as a shortcut (and it works in my DMs!)
+                You can also use `$s` or `/s` as a shortcut
                 """;
     }
 }

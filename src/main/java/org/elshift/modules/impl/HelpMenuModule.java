@@ -2,19 +2,22 @@ package org.elshift.modules.impl;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import org.elshift.Main;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.SlashCommand;
+import org.elshift.commands.annotations.TextCommand;
 import org.elshift.commands.options.MultipleChoiceOption;
+import org.elshift.config.Config;
 import org.elshift.modules.Module;
+import org.elshift.util.ParsedTextCommand;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public class HelpMenuModule extends ListenerAdapter implements Module {
+public class HelpMenuModule implements Module {
     public HelpMenuModule() {
     }
 
@@ -31,27 +34,14 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
 
     // Raw text-command, due to slash-command unavailability
     // (Works in DMs and for clients that don't update when the bot first joins)
-    @Override
-    public void onMessageReceived(@NotNull MessageReceivedEvent event) {
-        String contents = event.getMessage().getContentDisplay();
+    @TextCommand(name = "help", description = "Learn how to use HelloBot")
+    public void onMessageReceived(@NotNull MessageReceivedEvent event, ParsedTextCommand parsedText) {
+        String args = parsedText.getCmdArgs();
+        if (args != null && args.startsWith("topic:"))
+            args = args.substring("topic:".length()).trim();
 
-        // TODO: Make this a common function. See SakugabooruModule's onMessageReceived, too.
-        final String[] prefixes = {"$help"};
-        String foundPrefix = null;
-        for (String prefix : prefixes) {
-            if (contents.startsWith(prefix)) {
-                foundPrefix = prefix;
-                break;
-            }
-        }
-
-        if (foundPrefix != null)
-            contents = contents.substring(foundPrefix.length()).trim();
-        else
-            return;
-
-        String msg = contents.isEmpty() ? formatActiveModules()
-                : formatRequestedModule(contents);
+        String msg = (args == null || args.isEmpty()) ? formatActiveModules()
+                : formatRequestedModule(args);
         event.getMessage().reply(msg).queue();
     }
 
@@ -75,15 +65,22 @@ public class HelpMenuModule extends ListenerAdapter implements Module {
     private String formatActiveModules() {
         List<String> moduleNames = Main.getBot().getActiveModules().stream().map(Module::getName).toList();
 
-        StringBuilder messageBuilder = new StringBuilder("Learn about any enabled features:\n```");
+        StringBuilder s = new StringBuilder("Learn about any enabled features:\n```");
 
-        moduleNames.forEach(name -> messageBuilder.append("\n/help %s".formatted(name)));
+        moduleNames.forEach(name -> s.append("\n/help %s".formatted(name)));
 
         if (moduleNames.isEmpty())
-            messageBuilder.append("No features are enabled!");
+            s.append("No features are enabled!");
 
-        messageBuilder.append("```\n(`$help` also works)");
-        return messageBuilder.toString();
+        s.append("```");
+
+        Collection<String> prefixes = Config.get().textPrefixes();
+        if (!prefixes.isEmpty()) {
+            s.append("\n(You can also use:");
+            prefixes.forEach(pf -> s.append(" `%shelp`".formatted(pf)));
+            s.append(')');
+        }
+        return s.toString();
     }
 
     @Override
