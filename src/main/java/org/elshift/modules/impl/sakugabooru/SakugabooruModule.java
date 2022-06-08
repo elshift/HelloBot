@@ -111,12 +111,12 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
         try {
             SakugabooruTag[] goodTags = fetchTags(nonFilterTag, 6, SakugabooruTag.Order.COUNT);
             int end = goodTags.length;
-            while (end > 0 && goodTags[end - 1].getCount() <= 0)
+            while (end > 0 && goodTags[end - 1].count <= 0)
                 --end;
 
             // Careful not to recommend the exact tag they just used!
             // (Ex: Used a bad filter like "spencer_wan score:>9999999", leading to 0 results yet no typos)
-            if (end == 1 && goodTags[0].getName().equals(nonFilterTag))
+            if (end == 1 && goodTags[0].name.equals(nonFilterTag))
                 return msg;
 
             if (end > 0) {
@@ -128,7 +128,7 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
                             buildMsg.append("or ");
                     }
 
-                    buildMsg.append("`%s`".formatted(goodTags[i].getName()));
+                    buildMsg.append("`%s`".formatted(goodTags[i].name));
                 }
                 msg = buildMsg.toString();
             }

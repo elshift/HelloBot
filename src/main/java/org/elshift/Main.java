@@ -3,8 +3,14 @@ package org.elshift;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import org.elshift.config.Config;
+import org.elshift.db.Database;
+import org.elshift.db.SqlGenerator;
+import org.elshift.db.SqlObjectReader;
+import org.elshift.modules.impl.sakugabooru.SakugabooruTag;
 import org.slf4j.LoggerFactory;
 
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;

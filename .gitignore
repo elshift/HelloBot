@@ -27,3 +27,5 @@ target/
 config.json
 downloads/
 .idea
+/*.db
+/*.sqlite
