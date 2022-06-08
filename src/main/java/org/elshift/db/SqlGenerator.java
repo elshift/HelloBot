@@ -136,15 +136,6 @@ public class SqlGenerator {
     }
 
     /**
-     * Generates a statement for creating an SQL table named after the type
-     *
-     * @return Statement that creates an SQL table
-     */
-    public String createTable() {
-        return createTable(typeSqlName);
-    }
-
-    /**
      * Generates a statement for inserting an object's values in an SQL table
      *
      * @param tableName Destination
@@ -167,16 +158,6 @@ public class SqlGenerator {
             logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
             return null;
         }
-    }
-
-    /**
-     * Generates a statement for inserting an object's values in an SQL table named after the type
-     *
-     * @param instance An instance of the target class
-     * @return Statement that inserts the object's values (at the time of call) in an SQL table
-     */
-    public String insertInto(Object instance) {
-        return insertInto(typeSqlName, instance);
     }
 
     /**
@@ -224,6 +205,30 @@ public class SqlGenerator {
     }
 
     /**
+     * Generates a statement for adding or updating multiple unique SQL rows.
+     * The target class must have a primary key.
+     *
+     * @param tableName Destination
+     * @param instances instances of the target class
+     * @return Statement that updates or inserts one Java object's values.
+     */
+    public String updateOrInsertMany(String tableName, Iterable<Object> instances) {
+        try {
+            // Technically not a proper upsert, but all the values are provided so that nothing is lost
+            MakeString<Object> toValueSets =
+                    i -> "(%s)".formatted(listToString(fieldMap.values(), f -> f.toValueString(i)));
+            return "INSERT OR REPLACE INTO %s (%s) VALUES %s".formatted(
+                    tableName,
+                    listToString(fieldMap.values(), SqlField::sqlName),
+                    listToString(instances, toValueSets)
+            );
+        } catch (IllegalAccessException e) {
+            logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
+            return null;
+        }
+    }
+
+    /**
      * Generates a statement for adding or updating a unique SQL row.
      * The target class must have a primary key.
      *
@@ -232,10 +237,6 @@ public class SqlGenerator {
      * @return Statement that updates or inserts one Java object's values.
      */
     public String updateOrInsert(String tableName, Object instance) {
-        String sqlCondition = primaryKeyCondition(instance);
-        if (sqlCondition == null)
-            return null;
-
         try {
             // Technically not a proper upsert, but all the values are provided so that nothing is lost
             return "INSERT OR REPLACE INTO %s (%s) VALUES (%s)".formatted(
@@ -468,7 +469,7 @@ record SqlField(
 
     public void setValue(Object instance, Object value) throws IllegalAccessException {
         if (sqlType == SqlGenerator.SqlType.BIT) {
-            value = (Integer)value == 1;
+            value = (Integer) value == 1;
         }
 
         javaField.set(instance, value);

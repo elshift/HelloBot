@@ -1,6 +1,8 @@
 package org.elshift.modules.impl.sakugabooru;
 
 import com.google.gson.Gson;
+import com.google.gson.stream.JsonReader;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
@@ -8,6 +10,8 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.elshift.commands.annotations.Option;
 import org.elshift.commands.annotations.SlashCommand;
 import org.elshift.commands.annotations.TextCommand;
+import org.elshift.config.Config;
+import org.elshift.db.Database;
 import org.elshift.modules.Module;
 import org.elshift.util.ParsedTextCommand;
 import org.jetbrains.annotations.NotNull;
@@ -21,15 +25,26 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class SakugabooruModule extends ListenerAdapter implements Module {
     // Can be any server running Moebooru (and probably works for most Danbooru instances too)
     private static final String MOEBOORU_API = "https://sakugabooru.com";
+    private static final int DB_UPDATE_BATCH_SIZE = 500;
+    private static final long LONG_OPERATION_NOTIFY_TIME_MS = 3_000;
+    private static final long TAG_UPDATE_COOLDOWN_MS = 60_000;
     private static final Logger logger = LoggerFactory.getLogger(SakugabooruModule.class);
+
+    private static long lastTagUpdateMs = 0;
+
+    static {
+        Database db = Config.get().sqlDatabase();
+        db.seed(SakugabooruTag.class);
+        updateLatestTags();
+    }
 
     @Override
     public boolean usesSlashCommands() {
@@ -46,7 +61,7 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
                 return;
             }
 
-            event.reply(formatSearchedPost(posts[0], tags)).queue();
+            event.reply(formatPost(posts[0], event.getUser(), tags)).queue();
         } catch (Exception e) {
             logger.error("Failed to search %s".formatted(MOEBOORU_API), e);
             event.reply("Failed to search: " + e.getMessage()).setEphemeral(true).queue();
@@ -55,10 +70,17 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
 
     @TextCommand(name = "sakuga", description = "Search Sakugabooru", aliases = {"s"})
     public void textSearchSakuga(@NotNull MessageReceivedEvent event, ParsedTextCommand parsedText) {
-        Set<String> tags = createSimplifiedTags(parsedText.getCmdArgs());
+        String args = parsedText.getCmdArgs();
+        if (args != null && args.startsWith("tags:"))
+            args = args.substring("tags:".length()).trim();
+
+        Set<String> tags = createSimplifiedTags(args);
         try {
             SakugabooruPost[] posts = fetchPosts(tags);
-            String msg = (posts.length > 0) ? formatSearchedPost(posts[0], tags) : formatEmptySearchResults(tags);
+            String msg;
+            if (posts.length > 0)
+                msg = formatPost(posts[0], event.getAuthor(), tags);
+            else msg = formatEmptySearchResults(tags);
             event.getMessage().reply(msg).queue();
         } catch (Exception e) {
             if (!(e instanceof InsufficientPermissionException)) { // Ignore permission errors. Not our problem.
@@ -68,25 +90,47 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
         }
     }
 
-    private String formatPost(SakugabooruPost Post) {
-        String postUrl = "%s/post/show/%d".formatted(MOEBOORU_API, Post.getId());
-        String message = """
-                **Post URL**: <%s>
-                **Tags**: %s
-                %s
-                """.formatted(postUrl, Post.getTags(), Post.getFileUrl());
-        return message.replace("@", "\\@");
+    private String formatPost(SakugabooruPost post, User searchAuthor, Set<String> searchedTags) {
+        List<String> allTags = Arrays.stream(post.getTags().split(" ")).toList();
+
+        if (shouldUpdateTags())
+            updateLatestTags();
+
+        String search = formatSearch(searchAuthor, searchedTags);
+        String postUrl = ":link: **Post**:       <%s/post/show/%d>".formatted(MOEBOORU_API, post.getId());
+        String tags = formatTags(allTags);
+        String artists = formatArtists(allTags);
+        String postFile = post.getFileUrl();
+
+        return joinNonEmptyStrings("\n", search, postUrl, tags, artists, postFile);
     }
 
-    private String formatSearchedPost(SakugabooruPost Post, Set<String> SearchedTags) {
-        String postUrl = "%s/post/show/%d".formatted(MOEBOORU_API, Post.getId());
-        String message = """
-                **Post URL**: <%s>
-                **Search**: %s
-                **Tags**: %s
-                %s
-                """.formatted(postUrl, String.join(" ", SearchedTags), Post.getTags(), Post.getFileUrl());
-        return message.replace("@", "\\@");
+    private String formatPost(SakugabooruPost post) {
+        return formatPost(post, null, null);
+    }
+
+    private String formatTags(Collection<String> tagNames) {
+        String joined = "*(none)*";
+        if (tagNames != null && !tagNames.isEmpty())
+            joined = sanitize(String.join(" ", tagNames));
+        return ":file_folder: **Tags**:      " + joined;
+    }
+
+    private String formatArtists(Collection<String> tagNames) {
+        if (tagNames == null || tagNames.isEmpty())
+            return null;
+
+        String[] artistList = tagNames.stream().filter(SakugabooruModule::isTagArtist).toArray(String[]::new);
+        return ":artist: **Artists**:  " + sanitize(String.join(" ", artistList));
+    }
+
+    private String formatSearch(User user, Collection<String> searchedTags) {
+        if (user == null || searchedTags == null || searchedTags.isEmpty())
+            return null;
+        return "*%s: \"%s\"*".formatted(
+                user.getAsMention(),
+                sanitize(String.join(" ", searchedTags))
+        );
     }
 
     private String formatEmptySearchResults(Set<String> SearchedTags) {
@@ -140,10 +184,13 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
 
     private Set<String> createSimplifiedTags(String SpacedTags) {
         Set<String> tags;
-        if (SpacedTags == null)
+        if (SpacedTags == null) {
             tags = new HashSet<>();
-        else // Place all tags in set to avoid duplicates
-            tags = Arrays.stream(SpacedTags.split(" ")).collect(Collectors.toSet());
+        } else { // Place all tags in set to avoid duplicates
+            tags = Arrays.stream(
+                    SpacedTags.toLowerCase(Locale.ROOT).split(" ")
+            ).collect(Collectors.toSet());
+        }
 
         boolean hasOrder = false; // Did the user explicitly set a sort/order?
         for (String tag : tags) {
@@ -186,6 +233,99 @@ public class SakugabooruModule extends ListenerAdapter implements Module {
                 return new Gson().fromJson(reader, classOfT);
             }
         }
+    }
+
+    /**
+     * Fetches all tags and inserts them into the DB
+     *
+     * @param afterId Fetch all tags that have an id number greater than this
+     * @return False if errors occurred
+     */
+    private static boolean updateTags(int afterId) {
+        lastTagUpdateMs = System.currentTimeMillis();
+
+        try {
+            URL url = new URL("%s/tag.json?limit=0&after_id=%d&order=date".formatted(MOEBOORU_API, afterId));
+            HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+            try (InputStream stream = conn.getInputStream()) {
+                Gson gson = new Gson();
+                JsonReader jsonReader = gson.newJsonReader(new InputStreamReader(stream));
+                Database db = Config.get().sqlDatabase();
+                ArrayList<SakugabooruTag> batch = new ArrayList<>();
+                long lastTime = System.currentTimeMillis();
+                int total = 0;
+
+                jsonReader.beginArray();
+                while (jsonReader.hasNext()) {
+                    ++total;
+                    batch.add(gson.fromJson(jsonReader, SakugabooruTag.class));
+
+                    long newTime = System.currentTimeMillis();
+                    if (newTime - lastTime >= LONG_OPERATION_NOTIFY_TIME_MS) {
+                        lastTime = newTime;
+                        logger.info("Updating... %s tags".formatted(total));
+                    }
+
+                    if (batch.size() >= DB_UPDATE_BATCH_SIZE) {
+                        if (!db.updateOrInsertMany(SakugabooruTag.class, batch))
+                            return false;
+                        batch.clear();
+                    }
+                }
+                jsonReader.endArray();
+                jsonReader.close();
+
+                if (!batch.isEmpty() && !db.updateOrInsertMany(SakugabooruTag.class, batch))
+                    return false;
+            }
+        } catch (IOException e) {
+            logger.error("Failed to update tags", e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Fetches new tags and inserts them into the DB
+     *
+     * @return False if errors occurred
+     */
+    private static boolean updateLatestTags() {
+        Database db = Config.get().sqlDatabase();
+        Integer maxId = db.querySimple(Integer.class, "SELECT MAX(id) FROM SakugabooruTag");
+        if (maxId == null)
+            maxId = 0;
+
+        return updateTags(maxId);
+    }
+
+    private static boolean shouldUpdateTags() {
+        return System.currentTimeMillis() - lastTagUpdateMs >= TAG_UPDATE_COOLDOWN_MS;
+    }
+
+    private static boolean isTagArtist(String tagName) {
+        Database db = Config.get().sqlDatabase();
+        try {
+            PreparedStatement stmt = db.preparedStatement("SELECT type FROM SakugabooruTag WHERE name = ?");
+            stmt.setString(1, tagName);
+            Integer tagType = db.querySimple(Integer.class, stmt.executeQuery());
+            if (tagType != null && tagType == SakugabooruTag.Type.ARTIST.intValue) {
+                return true;
+            }
+        } catch (SQLException e) {
+            logger.error("isTagArtist failed", e);
+        }
+        return false;
+    }
+
+    private static String joinNonEmptyStrings(String delimiter, String... strings) {
+        return String.join(delimiter, Arrays.stream(strings).filter(
+                s -> s != null && !s.isEmpty()
+        ).toArray(String[]::new));
+    }
+
+    private static String sanitize(String discordMsg) {
+        return discordMsg.replace("@", "\\@");
     }
 
     @Override

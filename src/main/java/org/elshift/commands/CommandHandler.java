@@ -11,8 +11,6 @@ import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.AutoCompleteQuery;
 import net.dv8tion.jda.api.interactions.commands.Command;
-import net.dv8tion.jda.api.interactions.commands.CommandInteractionPayload;
-import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import org.elshift.commands.annotations.RunMode;
@@ -28,7 +26,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 /**
  * Listens for and handles execution of interactions.
@@ -73,7 +70,10 @@ public class CommandHandler extends ListenerAdapter {
 
             if (slashCommands.stream().noneMatch(info -> info.getName().equals(command.getName()))) {
                 logger.info("Removing old command: " + command.getName());
-                command.delete().queue();
+                try {
+                    command.delete().queue();
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -98,7 +98,7 @@ public class CommandHandler extends ListenerAdapter {
                 cmdMethod.invoke(event);
             } catch (Exception e) {
                 logger.error("Failed to execute command {}", cmdMethod.getName(), e);
-                String response = "Failed to execute command!";
+                String response = "Failed to execute command! " + e;
 
                 if (event instanceof SlashCommandInteractionEvent slashEvent)
                     slashEvent.reply(response).setEphemeral(true).queue();

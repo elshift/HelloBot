@@ -37,16 +37,28 @@ public class Database {
             stmt = con.createStatement();
     }
 
+    /**
+     * Initializes the necessary Java info and SQL tables for the given Java types, if not already done
+     *
+     * @param types A list of Java types to add to the database
+     * @return False if errors occurred
+     */
     public boolean seed(Class<?>... types) {
         for (Class<?> c : types) {
-            if (executeUpdate(getOrMakeGen(c).createTable()) == -1)
+            SqlGenerator gen = getOrMakeGen(c);
+            if (executeUpdate(gen.createTable(gen.getSqlName())) == -1)
                 return false;
         }
         return true;
     }
 
+    public PreparedStatement preparedStatement(String sql) throws SQLException {
+        return con.prepareStatement(sql);
+    }
+
     public boolean insert(Object o) {
-        return executeUpdate(getTypeGen(o.getClass()).insertInto(o)) > 0;
+        SqlGenerator gen = getTypeGen(o.getClass());
+        return executeUpdate(gen.insertInto(gen.getSqlName(), o)) > 0;
     }
 
     public boolean updateWhere(Object o, String sqlCondition, String... sqlFields) {
@@ -64,8 +76,13 @@ public class Database {
         return executeUpdate(gen.updateOrInsert(gen.getSqlName(), o)) > 0;
     }
 
+    public <T> boolean updateOrInsertMany(Class<T> klass, Iterable<T> o) {
+        SqlGenerator gen = getTypeGen(klass);
+        return executeUpdate(gen.updateOrInsertMany(gen.getSqlName(), (Iterable<Object>) o)) > 0;
+    }
+
     /**
-     * Runs an arbitrary SQL query, and expects the results to match the given class
+     * Executes an arbitrary SQL query, and expects the results to match the given class
      *
      * @param klass    Java class being queried
      * @param sqlQuery SQL query to execute
@@ -77,6 +94,62 @@ public class Database {
             return null;
 
         return new SqlObjectReader<>(sqlResult, getTypeGen(klass));
+    }
+
+    /**
+     * Attempts to return the first simple value (int, char, bool, str)
+     *
+     * @param type      Java type to return
+     * @param sqlResult SQL cursor pointing at the desired value
+     * @param <T>       Java type to return
+     * @return An instance of {@code type} upon success. {@code null} on failure.
+     */
+    public <T> T querySimple(Class<T> type, ResultSet sqlResult) {
+        try {
+            if (!sqlResult.next())
+                return null;
+
+            Object o = sqlResult.getObject(1);
+            if (type.isInstance(o))
+                return type.cast(o);
+        } catch (SQLException e) {
+            logger.error("Failed to query simple value", e);
+        }
+        return null;
+    }
+
+    /**
+     * Executes an arbitrary SQL query, and attempts to return the first simple value (int, char, bool, str)
+     *
+     * @param type     Java type to return
+     * @param sqlQuery SQL query to execute
+     * @param <T>      Java type to return
+     * @return An instance of {@code type} upon success. {@code null} on failure.
+     */
+    public <T> T querySimple(Class<T> type, String sqlQuery) {
+        try {
+            try (ResultSet sqlResult = stmt.executeQuery(sqlQuery)) {
+                return querySimple(type, sqlResult);
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to query simple value", e);
+        }
+        return null;
+    }
+
+    /**
+     * Executes an arbitrary SQL query
+     *
+     * @param sqlQuery SQL query to execute
+     * @return A {@link ResultSet} instance on success. {@code null} on failure.
+     */
+    public ResultSet executeQuery(String sqlQuery) {
+        try {
+            return stmt.executeQuery(sqlQuery);
+        } catch (SQLException e) {
+            logger.error("executeUpdate failure", e);
+            return null;
+        }
     }
 
     /**
@@ -148,15 +221,6 @@ public class Database {
         } catch (SQLException e) {
             logger.error("executeUpdate failure", e);
             return -1;
-        }
-    }
-
-    private ResultSet executeQuery(String sql) {
-        try {
-            return stmt.executeQuery(sql);
-        } catch (SQLException e) {
-            logger.error("executeUpdate failure", e);
-            return null;
         }
     }
 
