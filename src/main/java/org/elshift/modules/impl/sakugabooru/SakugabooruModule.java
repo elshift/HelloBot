@@ -21,6 +21,7 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -326,7 +327,11 @@ public class SakugabooruModule implements Module {
     }
 
     private static String sanitize(String discordMsg) {
-        return discordMsg.replace("@", "\\@");
+        return discordMsg
+                .replace("@", "\\@")
+                .replace("_", "\\_")
+                .replace("*", "\\*")
+                .replace("`", "\\`");
     }
 
     @Override
