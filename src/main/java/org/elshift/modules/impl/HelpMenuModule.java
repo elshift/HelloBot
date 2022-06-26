@@ -93,11 +93,6 @@ public class HelpMenuModule implements Module {
         return "Provides help for enabled features";
     }
 
-    @Override
-    public boolean usesSlashCommands() {
-        return true;
-    }
-
     private static class ModuleNameOption extends MultipleChoiceOption<String> {
         @Override
         public Class<?> getType() {

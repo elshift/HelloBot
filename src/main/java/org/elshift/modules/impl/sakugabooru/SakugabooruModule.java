@@ -21,7 +21,6 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -42,13 +41,14 @@ public class SakugabooruModule implements Module {
 
     static {
         Database db = Config.get().sqlDatabase();
-        db.seed(SakugabooruTag.class);
-        updateLatestTags();
-    }
-
-    @Override
-    public boolean usesSlashCommands() {
-        return true;
+        if (db.isConnected()) {
+            try {
+                db.seed(SakugabooruTag.class);
+                updateLatestTags();
+            } catch (SQLException e) {
+                logger.error("Failed to seed db", e);
+            }
+        }
     }
 
     @SlashCommand(name = "sakuga", description = "Search Sakugabooru")
@@ -123,6 +123,9 @@ public class SakugabooruModule implements Module {
             return null;
 
         String[] artistList = tagNames.stream().filter(SakugabooruModule::isTagArtist).toArray(String[]::new);
+        if (artistList.length == 0)
+            return null;
+
         return ":artist: **Artists**:  " + sanitize(String.join(" ", artistList));
     }
 
@@ -280,7 +283,7 @@ public class SakugabooruModule implements Module {
                 if (!batch.isEmpty() && !db.updateOrInsertMany(SakugabooruTag.class, batch))
                     return false;
             }
-        } catch (IOException e) {
+        } catch (IOException | SQLException e) {
             logger.error("Failed to update tags", e);
             return false;
         }
@@ -293,31 +296,38 @@ public class SakugabooruModule implements Module {
      * @return False if errors occurred
      */
     private static boolean updateLatestTags() {
-        Database db = Config.get().sqlDatabase();
-        Integer maxId = db.querySimple(Integer.class, "SELECT MAX(id) FROM SakugabooruTag");
-        if (maxId == null)
-            maxId = 0;
-
-        return updateTags(maxId);
+        try {
+            Database db = Config.get().sqlDatabase();
+            Integer maxId = db.querySimple(Integer.class, "SELECT MAX(id) FROM SakugabooruTag");
+            return updateTags(maxId);
+        } catch (SQLException e) {
+            logger.error("db error", e);
+            return false;
+        }
     }
 
     private static boolean shouldUpdateTags() {
+        Database db = Config.get().sqlDatabase();
+        if (!db.isConnected())
+            return false;
         return System.currentTimeMillis() - lastTagUpdateMs >= TAG_UPDATE_COOLDOWN_MS;
     }
 
     private static boolean isTagArtist(String tagName) {
         Database db = Config.get().sqlDatabase();
+        if (!db.isConnected())
+            return false;
+
         try {
-            PreparedStatement stmt = db.preparedStatement("SELECT type FROM SakugabooruTag WHERE name = ?");
-            stmt.setString(1, tagName);
-            Integer tagType = db.querySimple(Integer.class, stmt.executeQuery());
-            if (tagType != null && tagType == SakugabooruTag.Type.ARTIST.intValue) {
-                return true;
+            try (PreparedStatement stmt = db.preparedStatement("SELECT type FROM SakugabooruTag WHERE name = ?")) {
+                stmt.setString(1, tagName);
+                Integer tagType = db.querySimple(Integer.class, stmt.executeQuery());
+                return tagType == SakugabooruTag.Type.ARTIST.intValue;
             }
         } catch (SQLException e) {
             logger.error("isTagArtist failed", e);
+            return false;
         }
-        return false;
     }
 
     private static String joinNonEmptyStrings(String delimiter, String... strings) {

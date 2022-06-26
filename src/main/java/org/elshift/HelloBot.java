@@ -70,10 +70,8 @@ public class HelloBot extends ListenerAdapter {
 
             Module moduleInstance = (Module) klass.getDeclaredConstructor().newInstance();
 
-            if (moduleInstance.usesSlashCommands()) {
-                cmdBuilder.addModule(moduleInstance);
-                logger.debug("Added slash command module: {}", klassName);
-            }
+            cmdBuilder.addModule(moduleInstance);
+            logger.debug("Added slash command module: {}", klassName);
 
             if (ListenerAdapter.class.isAssignableFrom(klass)) {
                 jdaBuilder.addEventListeners(moduleInstance);

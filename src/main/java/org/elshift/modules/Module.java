@@ -13,11 +13,4 @@ public interface Module {
      * @return The help message of this module
      */
     String getHelpMessage();
-
-    /**
-     * @return Whether this module uses slash commands
-     */
-    default boolean usesSlashCommands() {
-        return false;
-    }
 }

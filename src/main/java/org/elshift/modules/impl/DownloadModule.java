@@ -209,9 +209,4 @@ public class DownloadModule extends ListenerAdapter implements Module {
     public String getHelpMessage() {
         return "Downloads videos from social media websites";
     }
-
-    @Override
-    public boolean usesSlashCommands() {
-        return true;
-    }
 }

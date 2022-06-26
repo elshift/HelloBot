@@ -43,7 +43,7 @@ public class Database {
      * @param types A list of Java types to add to the database
      * @return False if errors occurred
      */
-    public boolean seed(Class<?>... types) {
+    public boolean seed(Class<?>... types) throws SQLException {
         for (Class<?> c : types) {
             SqlGenerator gen = getOrMakeGen(c);
             if (executeUpdate(gen.createTable(gen.getSqlName())) == -1)
@@ -56,27 +56,27 @@ public class Database {
         return con.prepareStatement(sql);
     }
 
-    public boolean insert(Object o) {
+    public boolean insert(Object o) throws SQLException {
         SqlGenerator gen = getTypeGen(o.getClass());
         return executeUpdate(gen.insertInto(gen.getSqlName(), o)) > 0;
     }
 
-    public boolean updateWhere(Object o, String sqlCondition, String... sqlFields) {
+    public boolean updateWhere(Object o, String sqlCondition, String... sqlFields) throws SQLException {
         SqlGenerator gen = getTypeGen(o.getClass());
         return executeUpdate(gen.updateWhere(gen.getSqlName(), o, sqlCondition, sqlFields)) > 0;
     }
 
-    public boolean updateWherePrimaryKey(Object o, String... sqlFields) {
+    public boolean updateWherePrimaryKey(Object o, String... sqlFields) throws SQLException {
         SqlGenerator gen = getTypeGen(o.getClass());
         return executeUpdate(gen.updateWherePrimaryKey(gen.getSqlName(), o, sqlFields)) > 0;
     }
 
-    public boolean updateOrInsert(Object o) {
+    public boolean updateOrInsert(Object o) throws SQLException {
         SqlGenerator gen = getTypeGen(o.getClass());
         return executeUpdate(gen.updateOrInsert(gen.getSqlName(), o)) > 0;
     }
 
-    public <T> boolean updateOrInsertMany(Class<T> klass, Iterable<T> o) {
+    public <T> boolean updateOrInsertMany(Class<T> klass, Iterable<T> o) throws SQLException {
         SqlGenerator gen = getTypeGen(klass);
         return executeUpdate(gen.updateOrInsertMany(gen.getSqlName(), (Iterable<Object>) o)) > 0;
     }
@@ -88,7 +88,7 @@ public class Database {
      * @param sqlQuery SQL query to execute
      * @return A reader utility that wraps {@link ResultSet}
      */
-    public <T> SqlObjectReader<T> queryObjects(Class<T> klass, String sqlQuery) {
+    public <T> SqlObjectReader<T> queryObjects(Class<T> klass, String sqlQuery) throws SQLException {
         ResultSet sqlResult = executeQuery(sqlQuery);
         if (sqlResult == null)
             return null;
@@ -104,17 +104,13 @@ public class Database {
      * @param <T>       Java type to return
      * @return An instance of {@code type} upon success. {@code null} on failure.
      */
-    public <T> T querySimple(Class<T> type, ResultSet sqlResult) {
-        try {
-            if (!sqlResult.next())
-                return null;
+    public <T> T querySimple(Class<T> type, ResultSet sqlResult) throws SQLException {
+        if (!sqlResult.next())
+            return null;
 
-            Object o = sqlResult.getObject(1);
-            if (type.isInstance(o))
-                return type.cast(o);
-        } catch (SQLException e) {
-            logger.error("Failed to query simple value", e);
-        }
+        Object o = sqlResult.getObject(1);
+        if (type.isInstance(o))
+            return type.cast(o);
         return null;
     }
 
@@ -126,15 +122,10 @@ public class Database {
      * @param <T>      Java type to return
      * @return An instance of {@code type} upon success. {@code null} on failure.
      */
-    public <T> T querySimple(Class<T> type, String sqlQuery) {
-        try {
-            try (ResultSet sqlResult = stmt.executeQuery(sqlQuery)) {
-                return querySimple(type, sqlResult);
-            }
-        } catch (SQLException e) {
-            logger.error("Failed to query simple value", e);
+    public <T> T querySimple(Class<T> type, String sqlQuery) throws SQLException {
+        try (ResultSet sqlResult = stmt.executeQuery(sqlQuery)) {
+            return querySimple(type, sqlResult);
         }
-        return null;
     }
 
     /**
@@ -143,13 +134,8 @@ public class Database {
      * @param sqlQuery SQL query to execute
      * @return A {@link ResultSet} instance on success. {@code null} on failure.
      */
-    public ResultSet executeQuery(String sqlQuery) {
-        try {
-            return stmt.executeQuery(sqlQuery);
-        } catch (SQLException e) {
-            logger.error("executeUpdate failure", e);
-            return null;
-        }
+    public ResultSet executeQuery(String sqlQuery) throws SQLException {
+        return stmt.executeQuery(sqlQuery);
     }
 
     /**
@@ -161,22 +147,18 @@ public class Database {
      * @return The output object with its values updated to reflect the retrieved SQL fields.
      * Returns null on failure.
      */
-    public <T> T getFirstObjectWhere(T output, String sqlCondition) {
+    public <T> T getFirstObjectWhere(T output, String sqlCondition) throws SQLException {
         SqlGenerator gen = getTypeGen(output.getClass());
         ResultSet sqlResult = executeQuery(gen.selectWhere(gen.getSqlName(), sqlCondition));
         if (sqlResult == null)
             return null;
 
         T result = null;
-        try {
-            if (!sqlResult.next())
-                return null;
+        if (!sqlResult.next())
+            return null;
 
-            result = SqlObjectReader.readObject(sqlResult, gen, output);
-            sqlResult.close();
-        } catch (SQLException e) {
-            logger.error("Failed to read SQL ResultSet", e);
-        }
+        result = SqlObjectReader.readObject(sqlResult, gen, output);
+        sqlResult.close();
 
         return result;
     }
@@ -191,7 +173,7 @@ public class Database {
      * @return The output object with its values updated to reflect the retrieved SQL fields.
      * Returns null on failure.
      */
-    public <T> T getFirstObjectWhereFieldsMatch(T input, T output, String... sqlFields) {
+    public <T> T getFirstObjectWhereFieldsMatch(T input, T output, String... sqlFields) throws SQLException {
         SqlGenerator gen = getTypeGen(input.getClass());
         String sqlCondition = gen.matchingFieldsCondition(input, sqlFields);
         if (sqlCondition == null)
@@ -215,13 +197,8 @@ public class Database {
         return con != null; // && con.isValid() // This requires extra wait time
     }
 
-    private int executeUpdate(String sql) {
-        try {
-            return stmt.executeUpdate(sql);
-        } catch (SQLException e) {
-            logger.error("executeUpdate failure", e);
-            return -1;
-        }
+    private int executeUpdate(String sql) throws SQLException {
+        return stmt.executeUpdate(sql);
     }
 
     private <T> SqlGenerator getOrMakeGen(Class<T> c) {

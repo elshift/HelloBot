@@ -70,6 +70,8 @@ public class SqlGenerator {
     private final HashMap<String, SqlField> fieldMap = new HashMap<>();
 
     private static final Logger logger = LoggerFactory.getLogger(DownloadModule.class);
+    private static final String ACCESS_EXCEPTION_MSG =
+            "Couldn't access fields of valid instance. Perhaps the target class has mutated?";
 
     public SqlGenerator(Class type) {
         this.type = type;
@@ -155,7 +157,7 @@ public class SqlGenerator {
                     listToString(fieldMap.values(), f -> f.toValueString(instance))
             );
         } catch (IllegalAccessException e) {
-            logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
+            logger.error(ACCESS_EXCEPTION_MSG, e);
             return null;
         }
     }
@@ -182,7 +184,7 @@ public class SqlGenerator {
             );
 
         } catch (IllegalAccessException e) {
-            logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
+            logger.error(ACCESS_EXCEPTION_MSG, e);
             return null;
         }
     }
@@ -223,7 +225,7 @@ public class SqlGenerator {
                     listToString(instances, toValueSets)
             );
         } catch (IllegalAccessException e) {
-            logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
+            logger.error(ACCESS_EXCEPTION_MSG, e);
             return null;
         }
     }
@@ -245,7 +247,7 @@ public class SqlGenerator {
                     listToString(fieldMap.values(), f -> f.toValueString(instance))
             );
         } catch (IllegalAccessException e) {
-            logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
+            logger.error(ACCESS_EXCEPTION_MSG, e);
             return null;
         }
     }
@@ -269,7 +271,7 @@ public class SqlGenerator {
             }
             return "SELECT %s FROM %s WHERE %s".formatted(selection, tableName, sqlCondition);
         } catch (IllegalAccessException e) {
-            logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
+            logger.error(ACCESS_EXCEPTION_MSG, e);
             return null;
         }
     }
@@ -310,7 +312,7 @@ public class SqlGenerator {
                     listToString(toMatch, f -> f.toValueString(instance))
             );
         } catch (IllegalAccessException e) {
-            logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
+            logger.error(ACCESS_EXCEPTION_MSG, e);
             return null;
         }
     }
@@ -333,7 +335,7 @@ public class SqlGenerator {
                     listToString(primaryKeys, pk -> pk.toValueString(instance))
             );
         } catch (IllegalAccessException e) {
-            logger.error("Couldn't access fields of valid instance. Perhaps the target class has mutated?", e);
+            logger.error(ACCESS_EXCEPTION_MSG, e);
             return null;
         }
     }
